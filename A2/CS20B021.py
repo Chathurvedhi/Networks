@@ -6,6 +6,7 @@ def client(nr_ip, port_num):
     clientsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     while(True):
         hostname = input("Enter Server name: ")
+        #hi
         msg = hostname.encode()
         if(hostname == "bye"):
             clientsocket.sendto(msg,(nr_ip, port_num+53))
