@@ -1,0 +1,47 @@
+BEGIN_DATA
+NR 127.0.0.1
+RDS 127.0.0.1
+TDS_com 127.0.0.1
+TDS_edu 127.0.0.1
+ADS1 127.0.0.1
+ADS2 127.0.0.1
+ADS3 127.0.0.1
+ADS4 127.0.0.1
+ADS5 127.0.0.1
+ADS6 127.0.0.1
+List_of_ADS1
+www.abank.com 202.15.5.1
+smtp.abank.com 202.15.5.2
+ftp.abank.com 202.15.5.3
+sshd1.abank.com 202.15.5.4
+vpn.abank.com 202.15.5.5
+List_of_ADS2
+www.bbank.com 202.16.5.1
+smtp.bbank.com 202.16.5.2
+ftp.bbank.com 202.16.5.3
+sshd1.bbank.com 202.16.5.4
+vpn.bbank.com 202.16.5.5
+List_of_ADS3
+www.cbank.com 202.17.5.1
+smtp.cbank.com 202.17.5.2
+ftp.cbank.com 202.17.5.3
+sshd1.cbank.com 202.17.5.4
+vpn.cbank.com 202.17.5.5
+List_of_ADS4
+www.bbank.edu 202.18.5.1
+smtp.bbank.edu 202.18.5.2
+ftp.bbank.edu 202.18.5.3
+sshd1.bbank.edu 202.18.5.4
+vpn.bbank.edu 202.18.5.5
+List_of_ADS5
+www.cbank.edu 202.19.5.1
+smtp.cbank.edu 202.19.5.2
+ftp.cbank.edu 202.19.5.3
+sshd1.cbank.edu 202.19.5.4
+vpn.cbank.edu 202.19.5.5
+List_of_ADS6
+www.dbank.edu 202.20.5.1
+smtp.dbank.edu 202.20.5.2
+ftp.dbank.edu 202.20.5.3
+sshd1.dbank.edu 202.20.5.4
+vpn.dbank.edu 202.20.5.5
