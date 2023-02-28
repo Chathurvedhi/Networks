@@ -1,3 +1,13 @@
+# NAME: Chathurvedhi Talapaneni
+# Roll Number: CS20B021
+# Course: CS3205 Jan 2023 Semester
+# Lab number: 2
+# Date of Submission: 28/02/2023
+# I confirm that the source file is entirely written by me without
+# resorting to any dishonest means.
+# Website(s) that I used for basic socket programming code are:
+# URL: https://pythontic.com/modules/socket/udp-client-server-example ; Basic UDP python code
+
 import os
 import sys
 import socket
@@ -9,6 +19,7 @@ def client(nr_ip, port_num):
         msg = hostname.encode()
         if(hostname == "bye"):
             clientsocket.sendto(msg,(nr_ip, port_num+53))
+            print("All Server Processes are killed. Exiting.")
             exit()
         clientsocket.sendto(msg,(nr_ip, port_num+53))
         ip_info = clientsocket.recvfrom(1024)
