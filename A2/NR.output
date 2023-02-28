@@ -1,0 +1,15 @@
+*****************************************************
+Query: www.bbank.com 
+Response(IP,port): 202.16.5.1
+*****************************************************
+Query: www.abask.co 
+Response: No DNS Record Found
+*****************************************************
+Query: bye 
+Response: Closing all servers
+*****************************************************
+Query: www.abask.com 
+Response: No DNS Record Found
+*****************************************************
+Query: bye 
+Response: Closing all servers
