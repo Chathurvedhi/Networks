@@ -6,7 +6,6 @@ def client(nr_ip, port_num):
     clientsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     while(True):
         hostname = input("Enter Server name: ")
-        #hi
         msg = hostname.encode()
         if(hostname == "bye"):
             clientsocket.sendto(msg,(nr_ip, port_num+53))
@@ -14,6 +13,9 @@ def client(nr_ip, port_num):
         clientsocket.sendto(msg,(nr_ip, port_num+53))
         ip_info = clientsocket.recvfrom(1024)
         ip_info = ip_info[0].decode()
+        if(ip_info == "No DNS Record Found"):
+            print("No DNS Record Found")
+            continue
         print("Final DNS Mapping: ", ip_info)
 
 def nr_server(nr_ip,rds_ip, port_num):
@@ -23,18 +25,44 @@ def nr_server(nr_ip,rds_ip, port_num):
         data, client_ip = nr_socket.recvfrom(1024)      #data is hostname
         if data.decode() == "bye":                      #send bye to rds and exit
             nr_socket.sendto(data, (rds_ip, port_num+54))
+            f = open("NR.output", "a")
+            f.write("*****************************************************\n")
+            f.write("Query: " + data.decode() + " \nResponse: Closing all servers\n")
             exit()
         nr_socket.sendto(data, (rds_ip, port_num+54))   #send hostname to rds
         tld_info, rds_ip1 = nr_socket.recvfrom(1024)    #tld_info is tld_ip and tld_port
         tld_info = tld_info.decode()
+        if(tld_info == "No DNS Record Found"):      #send error msg to client
+            nr_socket.sendto(tld_info.encode(), client_ip)
+            f = open("NR.output", "a")
+            f.write("*****************************************************\n")
+            f.write("Query: " + data.decode() + " \nResponse: " + tld_info + "\n")
+            continue
         tld_ip, tld_port = tld_info.split()
         nr_socket.sendto(data, (tld_ip, int(tld_port))) #send hostname to tld
         ads_info, tld_ip1 = nr_socket.recvfrom(1024)    #ads_info is ads_ip and ads_port
         ads_info = ads_info.decode()
+        if(ads_info == "No DNS Record Found"):      #send error msg to client
+            nr_socket.sendto(ads_info.encode(), client_ip)
+            f = open("NR.output", "a")
+            f.write("*****************************************************\n")
+            f.write("Query: " + data.decode() + " \nResponse: " + ads_info + "\n")
+            continue
         ads_ip, ads_port = ads_info.split()
         nr_socket.sendto(data, (ads_ip, int(ads_port))) #send hostname to ads
         ip_info, ads_ip1 = nr_socket.recvfrom(1024)     #ip_info is final DNS mapping
+        ip_info1 = ip_info.decode()
+        if(ip_info1 == "No DNS Record Found"):      #send error msg to client
+            nr_socket.sendto(ip_info, client_ip)
+            f = open("NR.output", "a")
+            f.write("*****************************************************\n")
+            f.write("Query: " + data.decode() + " \nResponse: " + ip_info1 + "\n")
+            continue
         nr_socket.sendto(ip_info, client_ip)            #send ip_info to client
+        #print query and response in NR.output
+        f = open("NR.output", "a")
+        f.write("*****************************************************\n")
+        f.write("Query: " + data.decode() + " \nResponse(IP,port): " + ip_info.decode()+"\n")
 
 def rds_server(rds_ip, tld_com, tld_edu, port_num):
     rds_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -51,6 +79,16 @@ def rds_server(rds_ip, tld_com, tld_edu, port_num):
         elif data.decode().endswith(".edu"):
             msg = tld_edu + " " + str(port_num+56)
             rds_socket.sendto(msg.encode(), nr_ip)  #send tld_edu to nr
+        else:
+            msg = "No DNS Record Found"
+            rds_socket.sendto(msg.encode(), nr_ip)  #send error msg to nr
+            f = open("RDS.output", "a")
+            f.write("*****************************************************\n")
+            f.write("Query: " + data.decode() + " \nResponse: " + msg + "\n")
+            continue
+        f = open("RDS.output", "a")
+        f.write("*****************************************************\n")
+        f.write("Query: " + data.decode() + " \nResponse(IP,port): " + msg + "\n")
         
 def tld_com_server(tld_com, ads1, ads1_org, ads2, ads2_org, ads3, ads3_org, port_num):
     tld_com_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -63,6 +101,7 @@ def tld_com_server(tld_com, ads1, ads1_org, ads2, ads2_org, ads3, ads3_org, port
             tld_com_socket.sendto(data, (ads3, port_num+59))
             exit()
         data = data.decode()
+        data1 = data
         data = data.split(".")
         if data[1] == ads1_org:
             msg = ads1 + " " +str(port_num+57)
@@ -74,7 +113,15 @@ def tld_com_server(tld_com, ads1, ads1_org, ads2, ads2_org, ads3, ads3_org, port
             msg = ads3 + " " + str(port_num+59)
             tld_com_socket.sendto(msg.encode(), nr_ip)
         else:
-            print("Error in tld_com_server")
+            msg = "No DNS Record Found"
+            tld_com_socket.sendto(msg.encode(), nr_ip)
+            f = open("TDS.output", "a")
+            f.write("*****************************************************\n")
+            f.write("Query: " + data1 + " \nResponse: " + msg + "\n")
+            continue
+        f = open("TDS.output", "a")
+        f.write("*****************************************************\n")
+        f.write("Query: " + data1 + " \nResponse(IP,port): " + msg + "\n")
 
 def tld_edu_server(tld_edu, ads4, ads4_org, ads5, ads5_org, ads6, ads6_org, port_num):
     tld_edu_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -87,6 +134,7 @@ def tld_edu_server(tld_edu, ads4, ads4_org, ads5, ads5_org, ads6, ads6_org, port
             tld_edu_socket.sendto(data, (ads6, port_num+62))
             exit()
         data = data.decode()
+        data1 = data
         data = data.split(".")
         if data[1] == ads4_org:
             msg = ads4 + " " + str(port_num+60)
@@ -98,7 +146,15 @@ def tld_edu_server(tld_edu, ads4, ads4_org, ads5, ads5_org, ads6, ads6_org, port
             msg = ads6 + " " + str(port_num+62)
             tld_edu_socket.sendto(msg.encode(), nr_ip)
         else:
-            print("Error in tld_edu_server")
+            msg = "No DNS Record Found"
+            tld_edu_socket.sendto(msg.encode(), nr_ip)
+            f = open("TDS.output", "a")
+            f.write("*****************************************************\n")
+            f.write("Query: " + data1 + " \nResponse: " + msg + "\n")
+            continue
+        f = open("TDS.output", "a")
+        f.write("*****************************************************\n")
+        f.write("Query: " + data1 + " \nResponse(IP,port): " + msg + "\n")
 
 def ads1_server(ads1, port_num,ads1_map):
     ads1_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -112,7 +168,14 @@ def ads1_server(ads1, port_num,ads1_map):
         if data in ads1_map:
             ads1_socket.sendto(ads1_map[data].encode(), nr_ip)
         else:
-            ads1_socket.sendto("Not Found ADS1".encode(), nr_ip)
+            ads1_socket.sendto("No DNS Record Found".encode(), nr_ip)
+            f = open("ADS.output", "a")
+            f.write("*****************************************************\n")
+            f.write("Query: " + data + " \nResponse: " + "No DNS Record Found" + "\n")
+            continue
+        f = open("ADS.output", "a")
+        f.write("*****************************************************\n")
+        f.write("Query: " + data + " \nResponse IP: " + ads1_map[data] + "\n")
 
 def ads2_server(ads2, port_num,ads2_map):
     ads2_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -126,7 +189,15 @@ def ads2_server(ads2, port_num,ads2_map):
         if data in ads2_map:
             ads2_socket.sendto(ads2_map[data].encode(), nr_ip)
         else:
-            ads2_socket.sendto("Not Found ADS2".encode(), nr_ip)
+            ads2_socket.sendto("Not found in ads_server".encode(), nr_ip)
+            f = open("ADS.output", "a")
+            f.write("*****************************************************\n")
+            f.write("Query: " + data + " \nResponse: " + "No DNS Record Found" + "\n")
+            continue
+        f = open("ADS.output", "a")
+        f.write("*****************************************************\n")
+        f.write("Query: " + data + " \nResponse IP: " + ads2_map[data] + "\n")
+
         
 def ads3_server(ads3, port_num,ads3_map):
     ads3_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -140,7 +211,14 @@ def ads3_server(ads3, port_num,ads3_map):
         if data in ads3_map:
             ads3_socket.sendto(ads3_map[data].encode(), nr_ip)
         else:
-            ads3_socket.sendto("Not Found ADS3".encode(), nr_ip)
+            ads3_socket.sendto("Not found in ads_server".encode(), nr_ip)
+            f = open("ADS.output", "a")
+            f.write("*****************************************************\n")
+            f.write("Query: " + data + " \nResponse: " + "No DNS Record Found" + "\n")
+            continue
+        f = open("ADS.output", "a")
+        f.write("*****************************************************\n")
+        f.write("Query: " + data + " \nResponse IP: " + ads3_map[data] + "\n")
 
 def ads4_server(ads4, port_num,ads4_map):
     ads4_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -154,7 +232,14 @@ def ads4_server(ads4, port_num,ads4_map):
         if data in ads4_map:
             ads4_socket.sendto(ads4_map[data].encode(), nr_ip)
         else:
-            ads4_socket.sendto("Not Found ADS4".encode(), nr_ip)
+            ads4_socket.sendto("Not found in ads_server".encode(), nr_ip)
+            f = open("ADS.output", "a")
+            f.write("*****************************************************\n")
+            f.write("Query: " + data + " \nResponse: " + "No DNS Record Found" + "\n")
+            continue
+        f = open("ADS.output", "a")
+        f.write("*****************************************************\n")
+        f.write("Query: " + data + " \nResponse IP: " + ads4_map[data] + "\n")
 
 def ads5_server(ads5, port_num,ads5_map):
     ads5_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -168,7 +253,14 @@ def ads5_server(ads5, port_num,ads5_map):
         if data in ads5_map:
             ads5_socket.sendto(ads5_map[data].encode(), nr_ip)
         else:
-            ads5_socket.sendto("Not Found ADS5".encode(), nr_ip)
+            ads5_socket.sendto("Not found in ads_server".encode(), nr_ip)
+            f = open("ADS.output", "a")
+            f.write("*****************************************************\n")
+            f.write("Query: " + data + " \nResponse: " + "No DNS Record Found" + "\n")
+            continue
+        f = open("ADS.output", "a")
+        f.write("*****************************************************\n")
+        f.write("Query: " + data + " \nResponse IP: " + ads5_map[data] + "\n")
 
 def ads6_server(ads6, port_num,ads6_map):
     ads6_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -182,7 +274,14 @@ def ads6_server(ads6, port_num,ads6_map):
         if data in ads6_map:
             ads6_socket.sendto(ads6_map[data].encode(), nr_ip)
         else:
-            ads6_socket.sendto("Not Found ADS6".encode(), nr_ip)
+            ads6_socket.sendto("Not found in ads_server".encode(), nr_ip)
+            f = open("ADS.output", "a")
+            f.write("*****************************************************\n")
+            f.write("Query: " + data + " \nResponse: " + "No DNS Record Found" + "\n")
+            continue
+        f = open("ADS.output", "a")
+        f.write("*****************************************************\n")
+        f.write("Query: " + data + " \nResponse IP: " + ads6_map[data] + "\n")
 
 #Reading file
 port_num = sys.argv[1]
