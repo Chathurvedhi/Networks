@@ -1,9 +1,0 @@
-*****************************************************
-Query: www.bbank.com 
-Response(IP,port): 127.0.0.1 20075
-*****************************************************
-Query: www.abask.co 
-Response: No DNS Record Found
-*****************************************************
-Query: www.abask.com 
-Response(IP,port): 127.0.0.1 20075

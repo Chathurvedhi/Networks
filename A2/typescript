@@ -1,0 +1,19 @@
+Script started on 2023-03-04 10:22:36+05:30 [TERM="xterm-256color" TTY="/dev/pts/1" COLUMNS="116" LINES="25"]
+[1m[7m%[27m[1m[0m                                                                                                                    ]2;yolo@bolo:~/Networks-CS3205/Networks/A2]1;..5/Networks/A2[0m[27m[24m[J
+[01;34mNetworks-CS3205/Networks/A2[00m  [32mmain [31m✗[00m[00m 
+[37m▶[00m [K[102C[1A[37m3d10h[00m [33m⚑ [37m◒  [01;31m[00m[1B[113D[?1h=[?2004h[32mscript[39m[32me[32mx[32mi[32mt[39m[39m [39m [32mp[32my[32mt[32mh[32mon[39m [4mCS20B021.py[24m 20000 [4mtext[24m[?1l>[?2004l
+]2;python CS20B021.py 20000 text]1;pythonEnter Server name: www.bank.com
+Final DNS Mapping:  202.15.5.1
+Enter Server name: ftp.store.com
+Final DNS Mapping:  143.11.5.23
+Enter Server name: ftp.brown.edu
+Final DNS Mapping:  192.13.5.3
+Enter Server name: ftp.brown.com
+No DNS Record Found
+Enter Server name: bye
+All Server Processes are killed. Exiting.
+[1m[7m%[27m[1m[0m                                                                                                                    ]2;yolo@bolo:~/Networks-CS3205/Networks/A2]1;..5/Networks/A2[0m[27m[24m[J
+[01;34mNetworks-CS3205/Networks/A2[00m  [32mmain [31m✗[00m[00m 
+[37m▶[00m [K[102C[1A[37m3d10h[00m [33m⚑ [37m◒  [01;31m[00m[1B[113D[?1h=[?2004h[1m[31me[0m[39m[1m[31me[0m[39m[90mxit[39m[1m[31me[1m[31mx[0m[39m[1m[31me[1m[31mx[1m[31mi[0m[39m[0m[32me[0m[32mx[0m[32mi[32mt[39m[?1l>[?2004l
+]2;exit]1;exit
+Script done on 2023-03-04 10:23:23+05:30 [COMMAND_EXIT_CODE="0"]
