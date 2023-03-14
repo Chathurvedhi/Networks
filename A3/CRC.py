@@ -1,0 +1,91 @@
+import os
+import sys
+import random
+
+
+def crc8(data, crc_code):       # data is a string of bytes 
+    data_init = data
+    data = data + "00000000"    # add 8 0s to the end of data
+    data = list(data)         
+    crc_code = list(crc_code)
+    rem = data[:len(crc_code)]
+    
+    for i in range(len(data) - 8):
+        print(rem)
+        if rem[0] == "0":      # remove first 0 and add next bit
+            rem.pop(0)
+            if(len(data) > len(crc_code) + i):
+                rem.append(data[len(crc_code) + i])
+        else:
+            for j in range(len(crc_code)):
+                if rem[j] == crc_code[j]:
+                    rem[j] = "0"
+                else:
+                    rem[j] = "1"
+            rem.pop(0)
+            if(len(data) > len(crc_code) + i):
+                rem.append(data[len(crc_code) + i])
+    rem = "".join(rem)
+    print(rem)
+    encode = data_init + rem
+    return encode
+
+def crc_error(encode, crc_code):
+    data = encode
+    data = list(data)
+    crc_code = list(crc_code)
+    rem = data[:len(crc_code)]
+    
+    for i in range(len(data)):
+        print(rem)
+        if rem[0] == "0":      # remove first 0 and add next bit
+            rem.pop(0)
+            if(len(data) > len(crc_code) + i):
+                rem.append(data[len(crc_code) + i])
+        else:
+            for j in range(len(crc_code)):
+                if rem[j] == crc_code[j]:
+                    rem[j] = "0"
+                else:
+                    rem[j] = "1"
+            rem.pop(0)
+            if(len(data) > len(crc_code) + i):
+                rem.append(data[len(crc_code) + i])
+    rem = "".join(rem)
+    print(rem)
+    if rem == "00000000":
+        return True
+    else:
+        return False
+    
+def corrupt_odd(encode):    # randomly corrupt odd number of bits (3 or above)
+    encode = list(encode)
+    num = random.randint(3, len(encode))
+    if num % 2 == 0:
+        num -= 1
+    # pick num unique locations to corrupt 
+    loc = []
+    for i in range(num):
+        loc.append(random.randint(0, len(encode) - 1))
+        while loc[i] in loc[:i]:
+            loc[i] = random.randint(0, len(encode) - 1)
+    for i in range(num):
+        if encode[loc[i]] == "0":
+            encode[loc[i]] = "1"
+        else:
+            encode[loc[i]] = "0"
+    encode = "".join(encode)
+    return encode
+
+
+
+
+data = "01001000011001010110"
+crc_code = "100000111"
+
+encode = crc8(data, crc_code)
+print(encode)
+
+
+
+
