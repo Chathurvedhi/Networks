@@ -78,7 +78,17 @@ def corrupt_odd(encode):    # randomly corrupt odd number of bits (3 or above)
     return encode, num
 
 
-#def corrupt_burst(encode):
+def corrupt_burst(encode, loc):
+    # corrupt 6 bits starting at loc
+    encode = list(encode)
+    for i in range(6):
+        if encode[loc + i] == "0":
+            encode[loc + i] = "1"
+        else:
+            encode[loc + i] = "0"
+    encode = "".join(encode)
+    return encode
+    
 
 def main():
     inpfile = sys.argv[1]
@@ -96,16 +106,37 @@ def main():
         g.write("\nCorrupted strings with odd number of errors: \n")
         g.write("\n" + "-" * 50 + "\n")
         for i in range(10):
-            encode, num = corrupt_odd(encode)
-            g.write("Corrupted String: " + encode + "\n")
+            c_encode, num = corrupt_odd(encode)
+            g.write("Corrupted String: " + c_encode + "\n")
             g.write("Number of Errors Introduced: " + str(num) + "\n")
             g.write("CRC Check: ")
-            if str(crc_error(encode, crc_code)) == "True":
+            if str(crc_error(c_encode, crc_code)) == "True":
                 g.write("No Error Detected\n")
             else:
                 g.write("Error Detected\n")
             g.write("-" * 50 + "\n")
         g.write("\nCorrupted strings with burst errors: \n")
+        g.write("\n" + "-" * 50 + "\n")
+        loc = []
+        for i in range(5):
+            loc.append(random.randint(100,110))
+            while loc[i] in loc[:i]:
+                loc[i] = random.randint(100,110)
+        for i in range(5):
+            c_encode = corrupt_burst(encode, loc[i])
+            g.write("Corrupted String: " + c_encode + "\n")
+            g.write("Location of Burst Error: " + str(loc[i]) + "\n")
+            g.write("CRC Check: ")
+            if str(crc_error(c_encode, crc_code)) == "True":
+                g.write("No Error Detected\n")
+            else:
+                g.write("Error Detected\n")
+            g.write("-" * 50 + "\n")
+        g.write("End of File: " + inpfile + "\n")
+
+            
+            
+
         g.write("\n" + "*" * 50 + "\n")
 
 if __name__ == "__main__":
