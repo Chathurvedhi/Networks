@@ -11,7 +11,7 @@ def crc8(data, crc_code):       # data is a string of bytes
     rem = data[:len(crc_code)]
     
     for i in range(len(data) - 8):
-        print(rem)
+        #print(rem)
         if rem[0] == "0":      # remove first 0 and add next bit
             rem.pop(0)
             if(len(data) > len(crc_code) + i):
@@ -26,7 +26,7 @@ def crc8(data, crc_code):       # data is a string of bytes
             if(len(data) > len(crc_code) + i):
                 rem.append(data[len(crc_code) + i])
     rem = "".join(rem)
-    print(rem)
+    #print(rem)
     encode = data_init + rem
     return encode
 
@@ -36,8 +36,8 @@ def crc_error(encode, crc_code):
     crc_code = list(crc_code)
     rem = data[:len(crc_code)]
     
-    for i in range(len(data)):
-        print(rem)
+    for i in range(len(data) - 8):
+        #print(rem)
         if rem[0] == "0":      # remove first 0 and add next bit
             rem.pop(0)
             if(len(data) > len(crc_code) + i):
@@ -52,7 +52,7 @@ def crc_error(encode, crc_code):
             if(len(data) > len(crc_code) + i):
                 rem.append(data[len(crc_code) + i])
     rem = "".join(rem)
-    print(rem)
+    #print(rem)
     if rem == "00000000":
         return True
     else:
@@ -75,17 +75,39 @@ def corrupt_odd(encode):    # randomly corrupt odd number of bits (3 or above)
         else:
             encode[loc[i]] = "0"
     encode = "".join(encode)
-    return encode
+    return encode, num
 
 
+#def corrupt_burst(encode):
 
+def main():
+    inpfile = sys.argv[1]
+    outfile = sys.argv[2]
+    f = open(inpfile, "r")
+    g = open(outfile, "w")
+    crc_code = "100000111"
+    lines = f.readlines()
+    g.write("*" * 50 + "\n")
+    for line in lines:
+        line = line.strip()
+        g.write("Original String: " + line + "\n")
+        encode = crc8(line, crc_code)
+        g.write("Original String with CRC: " + encode + "\n")
+        g.write("\nCorrupted strings with odd number of errors: \n")
+        g.write("\n" + "-" * 50 + "\n")
+        for i in range(10):
+            encode, num = corrupt_odd(encode)
+            g.write("Corrupted String: " + encode + "\n")
+            g.write("Number of Errors Introduced: " + str(num) + "\n")
+            g.write("CRC Check: ")
+            if str(crc_error(encode, crc_code)) == "True":
+                g.write("No Error Detected\n")
+            else:
+                g.write("Error Detected\n")
+            g.write("-" * 50 + "\n")
+        g.write("\nCorrupted strings with burst errors: \n")
+        g.write("\n" + "*" * 50 + "\n")
 
-data = "01001000011001010110"
-crc_code = "100000111"
-
-encode = crc8(data, crc_code)
-print(encode)
-
-
-
+if __name__ == "__main__":
+    main()
 
