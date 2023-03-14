@@ -1,4 +1,3 @@
-import os
 import sys
 import random
 
@@ -93,10 +92,12 @@ def main():
     f = open(inpfile, "r")
     g = open(outfile, "w")
     crc_code = "100000111"
-    lines = f.readlines()           # lines now stores all original strings
-    g.write("*" * 50 + "\n")
+    lines = f.readlines()  
+    count = 1         # lines now stores all original strings
     for line in lines:              # for each original string
         line = line.strip()
+        g.write("String " + str(count) + "\n\n")
+        count += 1
         g.write("Original String: " + line + "\n")
         encode = crc8(line, crc_code)
         g.write("Original String with CRC: " + encode + "\n")
@@ -129,12 +130,12 @@ def main():
             else:
                 g.write("Error Detected\n")
             g.write("-" * 50 + "\n")
-        g.write("End of File: " + inpfile + "\n")
+        g.write("\n" + "*" * 100 + "\n\n")
+    g.write("End of File: " + inpfile + "\n")
 
             
             
 
-        g.write("\n" + "*" * 50 + "\n")
 
 if __name__ == "__main__":          # call main
     main()
