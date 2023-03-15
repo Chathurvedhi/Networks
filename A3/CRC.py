@@ -126,9 +126,9 @@ def main():
             g.write("Location of Burst Error: " + str(loc[i]) + "\n")
             g.write("CRC Check: ")  # CRC error check
             if str(crc_error(c_encode, crc_code)) == "True":
-                g.write("No Error Detected\n")
+                g.write("Failed - No Error Detected\n")
             else:
-                g.write("Error Detected\n")
+                g.write("Passed - Error Detected\n")
             g.write("-" * 50 + "\n")
         g.write("\n" + "*" * 100 + "\n\n")
     g.write("End of File: " + inpfile + "\n")
