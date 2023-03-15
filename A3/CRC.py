@@ -109,9 +109,9 @@ def main():
             g.write("Number of Errors Introduced: " + str(num) + "\n")  # print number of errors introduced
             g.write("CRC Check: ")                                      # CRC error check
             if str(crc_error(c_encode, crc_code)) == "True":
-                g.write("No Error Detected\n")
+                g.write("Failed - No Error Detected\n")
             else:
-                g.write("Error Detected\n")
+                g.write("Passed - Error Detected\n")
             g.write("-" * 50 + "\n")
         g.write("\nCorrupted strings with burst errors: \n")
         g.write("\n" + "-" * 50 + "\n")
