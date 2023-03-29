@@ -13,7 +13,7 @@ using namespace std;
 #define localhost "127.0.0.1"
 
 //Constant variables for GBN
-float packet_gen_rate = 2; 
+float packet_gen_rate = 10; 
 int max_buffer_size = 10;
 int packet_len = 10;
 int window_size = 16;
@@ -170,7 +170,7 @@ void packet_creation()
         packets.push(packet);
         m.unlock();
         pack_num++;
-        sleep(1/packet_gen_rate);
+        usleep(1000000/packet_gen_rate);
     }
 }
 

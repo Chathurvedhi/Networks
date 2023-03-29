@@ -38,17 +38,16 @@ int main()
         exit(0);
     }
 
-    int NFE = 0;                           //Next Frame Expected
+    int NFE = 0;                            //Next Frame Expected
     float random_drop_prob = 0.2;           //Probability of dropping a packet
-    int max_packets = 10;                   //Maximum number of packets to be received
-    int packets_received = 0;               //Number of packets received
+    int max_packets = 100;                  //Maximum number of packets to be received
     bool debug = false;                     //Debug mode
     socklen_t len;
     len = sizeof(sendGBN);
 
     auto start = chrono::high_resolution_clock::now(); //Start time
 
-    while(1)
+    for(int i_t = 0; i_t < max_packets; i_t++)
     {
         // Receive the packet
         char buffer[MAX_LINE] = {0};
@@ -96,7 +95,5 @@ int main()
        
         // Increment NFE and packets received
         NFE = (NFE + 1);
-        packets_received++; 
-        
     }
 }
