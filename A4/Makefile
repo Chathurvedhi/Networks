@@ -1,4 +1,4 @@
-FLAGS = -g -Wall -O3
+FLAGS = -g -O3
 
 all : sender receiver
 
