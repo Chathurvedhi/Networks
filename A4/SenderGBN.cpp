@@ -85,7 +85,6 @@ void packet_ack(int sock, struct sockaddr_in &sendGBN, socklen_t &len)
     {
         char buffer[MAX_LINE] = {0};
         recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, (socklen_t *) &len);
-        cout<<"ACK "<<buffer<<" received"<<endl;
         m.lock();
         if(stoi(buffer) > LFT)
         {
@@ -114,30 +113,27 @@ void packet_sender()
 
     char buffer[MAX_LINE] = {0};
     socklen_t len;
+    thread packet_ack_thread(packet_ack, sock, ref(sendGBN), ref(len));
     while(1)
     {   
+        cout<<"Start window"<<endl;
         int w_trav = start_g;
         vector<thread> window_threads;
-        thread packet_ack_thread(packet_ack, sock, ref(sendGBN), ref(len));
         while(w_trav < end_g)
         {
-            if(timeout_check)
-            {
-                m.lock();
-                while(!window_threads.empty())
-                {
-                    window_threads.back().detach();
-                    window_threads.pop_back();
-                }
-                w_trav = timeout_val;
-                timeout_check = false;
-                break;
-                m.unlock();
-            }
             m.lock();
             bool temp = packets.empty();
             m.unlock();
             if(temp) continue;
+            if(timeout_check)
+            {
+                m.lock();
+                w_trav = timeout_val;
+                timeout_check = false;
+                m.unlock();
+                break;
+            }
+            cout<<"Window traversal"<<endl;
             m.lock();
             string packet = packets.front();
             packets.pop();
@@ -147,11 +143,16 @@ void packet_sender()
             window_threads.push_back(thread(timeout_ack, w_trav));
             w_trav++;
         }
-        packet_ack_thread.join();
+        while(!window_threads.empty())
+        {
+            window_threads.back().detach();
+            window_threads.pop_back();
+        }
         cout<<"Finished window" << endl;
         start_g = w_trav;
         end_g = start_g + window_size;
     }   
+    packet_ack_thread.join();
 }
 
 int main()
