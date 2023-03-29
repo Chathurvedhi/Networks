@@ -91,6 +91,7 @@ int main()
         // Send ACK
         string ack = to_string(seq_num);
         sendto(sock, ack.c_str(), ack.length(), MSG_CONFIRM, (const struct sockaddr *)&sendGBN, len);
+        cout<<"ACK sent: "<<ack<<endl;
        
         // Increment NFE and packets received
         NFE = (NFE + 1);
