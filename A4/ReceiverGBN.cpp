@@ -43,14 +43,16 @@ int main()
     int max_packets = 10;                   //Maximum number of packets to be received
     int packets_received = 0;               //Number of packets received
     bool debug = false;                     //Debug mode
+    socklen_t len;
+    len = sizeof(sendGBN);
 
-    //auto start = chrono::high_resolution_clock::now(); //Start time
+    auto start = chrono::high_resolution_clock::now(); //Start time
 
     while(1)
     {
         // Receive the packet
         char buffer[MAX_LINE] = {0};
-        int n = recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, (socklen_t *)sizeof(sendGBN));
+        int n = recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, &len);
         buffer[n] = '\0';
 
         // first byte of the packet is the sequence number 
@@ -62,17 +64,15 @@ int main()
         
 
         // Random Packet Drop 
-        //int temp = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-        //if(temp < random_drop_prob)
-        //    continue;
+        int temp = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+        if(temp < random_drop_prob)
+           continue;
 
         // Drop the packet if it is not the next frame expected
-        /*if(seq_num != NFE)
+        if(seq_num != NFE)
             continue;
-        */
 
         // If debug mode is on, print the received packet
-        /*
         if(debug)
         {
             auto end = chrono::high_resolution_clock::now();
@@ -84,13 +84,12 @@ int main()
             cout<<"Time: " << milli << ":" << micro << "  ";
             cout<<"Packet dropped: False "<<buffer<<endl;
         }
-        */
 
         // Send ACK
-        cout<<"Sending ACK: "<<seq_num<<endl;
+        // cout<<"Sending ACK: "<<seq_num<<endl;
         string ack = to_string(seq_num);
-        sendto(sock, ack.c_str(), ack.length(), MSG_CONFIRM, (const struct sockaddr *)&sendGBN, sizeof(sendGBN));
-        cout<<"ACK sent"<<endl;
+        sendto(sock, ack.c_str(), ack.length(), MSG_CONFIRM, (const struct sockaddr *)&sendGBN, len);
+        // cout<<"ACK sent"<<endl;
 
         // Increment NFE and packets received
         NFE = (NFE + 1);
