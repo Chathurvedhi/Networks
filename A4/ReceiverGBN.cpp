@@ -10,6 +10,7 @@ using namespace std;
 
 #define port_no 20020
 #define MAX_LINE 1024
+#define localhost "127.0.0.1"
 
 int main()
 {
@@ -27,7 +28,7 @@ int main()
     // Filling server information
     recvGBN.sin_family = AF_INET;
     recvGBN.sin_port = htons(port_no);
-    recvGBN.sin_addr.s_addr = INADDR_ANY;
+    recvGBN.sin_addr.s_addr = inet_addr(localhost);
 
     // Binding the socket with the server address
     int bind_status = bind(sock, (const struct sockaddr *)&recvGBN, sizeof(recvGBN));
@@ -37,37 +38,41 @@ int main()
         exit(0);
     }
 
-    int NFE = -1;                           //Next Frame Expected
+    int NFE = 0;                           //Next Frame Expected
     float random_drop_prob = 0.2;           //Probability of dropping a packet
-    int max_packets = 10;                   //Maximum number of packets to be recieved
-    int packets_recieved = 0;               //Number of packets recieved
+    int max_packets = 10;                   //Maximum number of packets to be received
+    int packets_received = 0;               //Number of packets received
     bool debug = false;                     //Debug mode
 
-    auto start = chrono::high_resolution_clock::now(); //Start time
+    //auto start = chrono::high_resolution_clock::now(); //Start time
 
-    while(max_packets > packets_recieved)
+    while(1)
     {
-        // Recieve the packet
+        // Receive the packet
         char buffer[MAX_LINE] = {0};
-        socklen_t len = sizeof(sendGBN);
-        int n = recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, &len);
+        int n = recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, (socklen_t *)sizeof(sendGBN));
         buffer[n] = '\0';
 
-        // First 4 bytes of the packet is the sequence number 
+        // first byte of the packet is the sequence number 
         int seq_num = 0;
-        for(int i = 0; i < 4; i++)
-            seq_num = seq_num*10 + (buffer[i] - '0');
+        seq_num = buffer[0] - '0';
+
+        cout<<"Seq No: "<<seq_num<<" NFE: "<<NFE<<endl;
+        cout<<"Packet : "<< buffer<<endl;
+        
 
         // Random Packet Drop 
-        int temp = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-        if(temp < random_drop_prob)
-            continue;
+        //int temp = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+        //if(temp < random_drop_prob)
+        //    continue;
 
         // Drop the packet if it is not the next frame expected
-        if(seq_num != NFE)
+        /*if(seq_num != NFE)
             continue;
+        */
 
-        // If debug mode is on, print the recieved packet
+        // If debug mode is on, print the received packet
+        /*
         if(debug)
         {
             auto end = chrono::high_resolution_clock::now();
@@ -79,13 +84,16 @@ int main()
             cout<<"Time: " << milli << ":" << micro << "  ";
             cout<<"Packet dropped: False "<<buffer<<endl;
         }
+        */
 
         // Send ACK
+        cout<<"Sending ACK: "<<seq_num<<endl;
         string ack = to_string(seq_num);
-        sendto(sock, ack.c_str(), ack.length(), MSG_CONFIRM, (const struct sockaddr *)&sendGBN, len);
+        sendto(sock, ack.c_str(), ack.length(), MSG_CONFIRM, (const struct sockaddr *)&sendGBN, sizeof(sendGBN));
+        cout<<"ACK sent"<<endl;
 
-        // Increment NFE and packets recieved
+        // Increment NFE and packets received
         NFE = (NFE + 1);
-        packets_recieved++; 
+        packets_received++; 
     }
 }
