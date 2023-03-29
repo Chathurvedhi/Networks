@@ -13,7 +13,7 @@ using namespace std;
 #define localhost "127.0.0.1"
 
 //Constant variables for GBN
-float packet_gen_rate = 10; 
+float packet_gen_rate = 2; 
 int max_buffer_size = 10;
 int packet_len = 10;
 int window_size = 16;
@@ -152,6 +152,28 @@ void packet_creation_temp()
     }
 }
 
+void packet_creation()
+{
+    int pack_num = 0;
+    while(1)
+    {
+        //cout<<"creating packets"<<packets.size()<<endl;
+        if(packets.size() == max_buffer_size)
+            continue;
+        string packet = "";
+        for(int j = 0; j < packet_len; j++)
+        {
+            packet += (char)(rand()%26 + 'a');
+        }
+        packet = to_string(pack_num) + "|" + packet;
+        m.lock();
+        packets.push(packet);
+        m.unlock();
+        pack_num++;
+        sleep(1/packet_gen_rate);
+    }
+}
+
 void packet_sender()
 {
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -170,10 +192,15 @@ void packet_sender()
 
     char buffer[MAX_LINE] = {0};
     socklen_t len;
-    while(packets.size())
-    {
+    while(1)
+    {   m.lock();
+        bool temp = packets.empty();
+        m.unlock();
+        if(temp) continue;
+        m.lock();
         string packet = packets.front();
         packets.pop();
+        m.unlock();
         sendto(sock, (const char *)packet.c_str(), packet.length(), MSG_CONFIRM, (const struct sockaddr *)&recvGBN, sizeof(recvGBN));
         cout<<"Packet "<<packet<<" sent"<<endl;
         recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, &len);
@@ -189,9 +216,11 @@ int main()
 
     srand(time(0));
 
-    packet_creation_temp();
+    //packet_creation_temp();
+    thread packetcreation_thread(packet_creation);
     thread packetsend_thread(packet_sender);
 
+    packetcreation_thread.join();
     packetsend_thread.join();
 }
 

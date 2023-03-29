@@ -61,7 +61,7 @@ int main()
         int seq_num = stoi(temp_buf.substr(0, pos));
         temp_buf = temp_buf.substr(pos+1, temp_buf.length());
 
-        cout<<"Seq No: "<<seq_num<<" NFE: "<<NFE<<endl;
+        cout<<"Seq No: "<<seq_num<<" NFE: "<<NFE<<" ";
         cout<<"Packet : "<< temp_buf<<endl;
         
 
@@ -91,13 +91,12 @@ int main()
         }
 
         // Send ACK
-        // cout<<"Sending ACK: "<<seq_num<<endl;
         string ack = to_string(seq_num);
         sendto(sock, ack.c_str(), ack.length(), MSG_CONFIRM, (const struct sockaddr *)&sendGBN, len);
-        // cout<<"ACK sent"<<endl;
-
+       
         // Increment NFE and packets received
         NFE = (NFE + 1);
         packets_received++; 
+        
     }
 }
