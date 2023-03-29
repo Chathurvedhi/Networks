@@ -55,18 +55,23 @@ int main()
         int n = recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, &len);
         buffer[n] = '\0';
 
-        // first byte of the packet is the sequence number 
-        int seq_num = 0;
-        seq_num = buffer[0] - '0';
+        // Split buffer by '|' to get the sequence number and the packet
+        string temp_buf(buffer);
+        int pos = temp_buf.find("|");
+        int seq_num = stoi(temp_buf.substr(0, pos));
+        temp_buf = temp_buf.substr(pos+1, temp_buf.length());
 
         cout<<"Seq No: "<<seq_num<<" NFE: "<<NFE<<endl;
-        cout<<"Packet : "<< buffer<<endl;
+        cout<<"Packet : "<< temp_buf<<endl;
         
 
         // Random Packet Drop 
-        int temp = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-        if(temp < random_drop_prob)
+        /*
+        float temp_num = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+        if(temp_num < random_drop_prob)
            continue;
+
+        */
 
         // Drop the packet if it is not the next frame expected
         if(seq_num != NFE)

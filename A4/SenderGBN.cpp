@@ -13,7 +13,7 @@ using namespace std;
 #define localhost "127.0.0.1"
 
 //Constant variables for GBN
-float packet_gen_rate = 1; 
+float packet_gen_rate = 10; 
 int max_buffer_size = 10;
 int packet_len = 10;
 int window_size = 3;
@@ -31,8 +31,6 @@ void packetcreation()
     int i = 0;
     while(1)
     {
-        if(packets.size() == max_buffer_size)
-            continue;
         // Random packet generation
         string packet = "";
         for(int j = 0; j < packet_len; j++)
@@ -41,6 +39,8 @@ void packetcreation()
         }
         packet = to_string(i) + "|" + packet;
         m.lock();
+        if(packets.size() == max_buffer_size)
+            continue;
         packets.push(packet);
         m.unlock();
         i++;
@@ -82,16 +82,23 @@ void packetsend()
     {
         if(packets.size() == 0)
             continue;
-        for(int i = start_g; i < end_g; i++)
+        int count = start_g;
+        while(1)
         {
+            if(count == end_g)
+                continue;
             m.lock();
             string packet = packets.front();
             packets.pop();
             m.unlock();
             sendto(sock, (const char *)packet.c_str(), packet.length(), MSG_CONFIRM, (const struct sockaddr *)&recvGBN, sizeof(recvGBN));
-            cout<<"Packet "<<i<<" sent"<<endl;
+            cout<<"Packet "<<count<<" sent"<<endl;
             thread packetaccept_thread(packetaccept, sock, ref(sendGBN), ref(len));
+            packetaccept_thread.detach();
         }
+
+
+
     }
     
 }
