@@ -67,8 +67,8 @@ int main()
         // Random Packet Drop 
         
         float temp_num = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-        if(temp_num < random_drop_prob)
-           continue;
+        //if(temp_num < random_drop_prob)
+        //   continue;
 
 
         // Drop the packet if it is not the next frame expected

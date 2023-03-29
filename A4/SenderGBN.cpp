@@ -16,7 +16,7 @@ using namespace std;
 float packet_gen_rate = 10; 
 int max_buffer_size = 10;
 int packet_len = 10;
-int window_size = 16;
+int window_size = 5;
 float timeout = 100;                        // in ms
 
 //Variables for GBN
@@ -152,6 +152,16 @@ void packet_creation_temp()
     }
 }
 
+void packet_ack()
+{
+
+}
+
+void timeout_ack(int count)
+{
+    
+}
+
 void packet_creation()
 {
     int pack_num = 0;
@@ -193,18 +203,29 @@ void packet_sender()
     char buffer[MAX_LINE] = {0};
     socklen_t len;
     while(1)
-    {   m.lock();
-        bool temp = packets.empty();
-        m.unlock();
-        if(temp) continue;
-        m.lock();
-        string packet = packets.front();
-        packets.pop();
-        m.unlock();
-        sendto(sock, (const char *)packet.c_str(), packet.length(), MSG_CONFIRM, (const struct sockaddr *)&recvGBN, sizeof(recvGBN));
-        cout<<"Packet "<<packet<<" sent"<<endl;
-        recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, &len);
-        cout<<"ACK "<<buffer<<" received"<<endl;
+    {   
+        int count = start_g;
+
+        while(count < end_g)
+        {
+            m.lock();
+            bool temp = packets.empty();
+            m.unlock();
+            if(temp) continue;
+            m.lock();
+            string packet = packets.front();
+            packets.pop();
+            m.unlock();
+            sendto(sock, (const char *)packet.c_str(), packet.length(), MSG_CONFIRM, (const struct sockaddr *)&recvGBN, sizeof(recvGBN));
+            cout<<"Packet "<<packet<<" sent"<<endl;
+            recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, &len);
+            cout<<"ACK "<<buffer<<" received"<<endl;
+            count++;
+        }
+        cout<<"Finished window" << endl;
+        start_g = count;
+        end_g = start_g + window_size;
+
     }   
 }
 
