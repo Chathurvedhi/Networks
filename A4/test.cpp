@@ -16,7 +16,7 @@ using namespace std;
 float packet_gen_rate = 10; 
 int max_buffer_size = 10;
 int packet_len = 10;
-int window_size = 5;
+int window_size = 10;
 float timeout = 4000;                        // in ms
 
 //Variables for GBN
@@ -25,9 +25,7 @@ int end_g = window_size;
 queue<string> packets;
 int timeout_val = -1;
 bool timeout_check = false;
-int prev_LFT = -1;
 int LFT = -1;
-unordered_map<int, thread> window_threads;
 
 //Mutex for synchronization
 mutex m;
@@ -75,7 +73,6 @@ void timeout_ack(int seq_no)
     m.lock();
     if(seq_no >= LFT + 1)
     {
-        cout<<"Timeout for packet "<<seq_no<<endl;
         timeout_check = true;
         timeout_val = LFT + 1;
     }
@@ -89,19 +86,10 @@ void packet_ack(int sock, struct sockaddr_in &sendGBN, socklen_t &len)
         char buffer[MAX_LINE] = {0};
         recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, (socklen_t *) &len);
         m.lock();
-        cout<<"Received ack for packet "<<buffer<<endl;
         if(stoi(buffer) > LFT)
         {
-            prev_LFT = LFT;
-            LFT = stoi(buffer) - start_g;
-            // Detach all threads till LFT
-            for(int i = prev_LFT + 1; i <= LFT; i++)
-            {
-                window_threads[i].detach();
-                window_threads.erase(i);
-            }
+            LFT = stoi(buffer);
         }
-        cout << "Finito ack" << buffer << endl;
         m.unlock();
     }
 }
@@ -129,8 +117,9 @@ void packet_sender()
     while(1)
     {   
         cout<<"Start window"<<endl;
-        int w_trav = 0;
-        while(w_trav < window_size)
+        int w_trav = start_g;
+        vector<thread> window_threads;
+        while(w_trav < end_g)
         {
             m.lock();
             bool temp = packets.empty();
@@ -141,11 +130,6 @@ void packet_sender()
                 m.lock();
                 w_trav = timeout_val;
                 timeout_check = false;
-                while(!window_threads.empty())
-                {
-                    window_threads.begin()->second.detach();
-                    window_threads.erase(window_threads.begin());
-                }
                 m.unlock();
                 break;
             }
@@ -154,22 +138,19 @@ void packet_sender()
             string packet = packets.front();
             packets.pop();
             m.unlock();
-            window_threads[w_trav] = thread(timeout_ack, w_trav);
             sendto(sock, (const char *)packet.c_str(), packet.length(), MSG_CONFIRM, (const struct sockaddr *)&recvGBN, sizeof(recvGBN));
             cout<<"Packet "<<packet<<" sent"<<endl;
+            window_threads.push_back(thread(timeout_ack, w_trav));
             w_trav++;
         }
-        cout<<"Finished window" << endl;
-        sleep(1);
-        m.lock();
         while(!window_threads.empty())
         {
-            window_threads.begin()->second.join();
-            window_threads.erase(window_threads.begin());
+            window_threads.back().detach();
+            window_threads.pop_back();
         }
-        start_g = start_g + w_trav;
+        cout<<"Finished window" << endl;
+        start_g = w_trav;
         end_g = start_g + window_size;
-        m.unlock();
     }   
     packet_ack_thread.join();
 }

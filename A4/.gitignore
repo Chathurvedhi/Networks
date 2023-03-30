@@ -1,6 +1,5 @@
 SenderGBN
 ReceiverGBN
 test
-test.cpp
 UDPClient.cpp
 UDPServer.cpp
