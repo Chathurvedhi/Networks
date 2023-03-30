@@ -104,7 +104,6 @@ void packet_ack(int sock, struct sockaddr_in &sendGBN, socklen_t &len)
                 window_threads.erase(i);
             }
         }
-        cout << "Finito ack" << buffer << endl;
         m.unlock();
     }
 }
@@ -131,7 +130,6 @@ void packet_sender()
     thread packet_ack_thread(packet_ack, sock, ref(sendGBN), ref(len));
     while(1)
     {   
-        cout<<"Start window"<<endl;
         int w_trav = 0;
         while(w_trav < window_size)
         {
@@ -153,7 +151,6 @@ void packet_sender()
                 m.unlock();
                 break;
             }
-            cout<<"Window traversal"<<endl;
             string packet = packets.front();
             packets.pop();
             m.unlock();
@@ -162,7 +159,6 @@ void packet_sender()
             cout<<"Packet "<<packet<<" sent"<<endl;
             w_trav++;
         }
-        cout<<"Window Complete Data" << endl;
         while(1)
         {
             m.lock();
@@ -182,7 +178,6 @@ void packet_sender()
             if(LFT == window_size - 1)
             {
                 LFT = -1;
-                if(window_threads.size() == 0) cout << "All threads detached";
                 cout<<"------------------------------------"<<endl;
                 m.unlock();
                 break;
