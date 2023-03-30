@@ -72,11 +72,15 @@ void timeout_ack(int seq_no, int start_val)
 {
     usleep(timeout*1000);
     m.lock();
-    if(!thread_kills[seq_no + start_val])
+    if(thread_kills[seq_no + start_val])
     {
-        cout<<"Timeout for packet "<<seq_no << "Start val " << start_val <<endl;
-        timeout_check = true;
+        //delete thread_kills key value seq_no + start_val
+        thread_kills.erase(seq_no + start_val);
+        m.unlock();
+        return;
     }
+    cout<<"Timeout for packet "<<seq_no << "Start val " << start_val <<endl;
+    timeout_check = true;
     m.unlock();
 }
 
