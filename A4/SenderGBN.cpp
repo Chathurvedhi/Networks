@@ -13,7 +13,7 @@ using namespace std;
 #define localhost "127.0.0.1"
 
 //Constant variables for GBN
-float packet_gen_rate = 10; 
+float packet_gen_rate = 2; 
 int max_buffer_size = 10;
 int packet_len = 10;
 int window_size = 5;
@@ -23,11 +23,11 @@ float timeout = 4000;                        // in ms
 int start_g = 0;
 int end_g = window_size;
 queue<string> packets;
-int timeout_val = -1;
 bool timeout_check = false;
 int prev_LFT = -1;
 int LFT = -1;
 unordered_map<int, thread> window_threads;
+unordered_map<int, bool> thread_kills;
 
 //Mutex for synchronization
 mutex m;
@@ -52,7 +52,6 @@ void packet_creation()
     int pack_num = 0;
     while(1)
     {
-        //cout<<"creating packets"<<packets.size()<<endl;
         if(packets.size() == max_buffer_size)
             continue;
         string packet = "";
@@ -69,15 +68,14 @@ void packet_creation()
     }
 }
 
-void timeout_ack(int seq_no)
+void timeout_ack(int seq_no, int start_val)
 {
     usleep(timeout*1000);
     m.lock();
-    if(seq_no >= LFT + 1)
+    if(!thread_kills[seq_no + start_val])
     {
-        cout<<"Timeout for packet "<<seq_no<<endl;
+        cout<<"Timeout for packet "<<seq_no << "Start val " << start_val <<endl;
         timeout_check = true;
-        timeout_val = LFT + 1;
     }
     m.unlock();
 }
@@ -97,6 +95,7 @@ void packet_ack(int sock, struct sockaddr_in &sendGBN, socklen_t &len)
             // Detach all threads till LFT
             for(int i = prev_LFT + 1; i <= LFT; i++)
             {
+                thread_kills[i + start_g] = true;
                 window_threads[i].detach();
                 window_threads.erase(i);
             }
@@ -136,37 +135,57 @@ void packet_sender()
             bool temp = packets.empty();
             m.unlock();
             if(temp) continue;
-            if(timeout_check)
+            m.lock();
+            if(timeout_check)   //Deal with error
             {
                 m.lock();
-                w_trav = timeout_val;
+                w_trav = LFT + 1;
                 timeout_check = false;
-                while(!window_threads.empty())
+                for(int i = LFT + 1; i < window_size; i++)
                 {
-                    window_threads.begin()->second.detach();
-                    window_threads.erase(window_threads.begin());
+                    window_threads[i].detach();
+                    window_threads.erase(i);
                 }
                 m.unlock();
                 break;
             }
             cout<<"Window traversal"<<endl;
-            m.lock();
             string packet = packets.front();
             packets.pop();
             m.unlock();
-            window_threads[w_trav] = thread(timeout_ack, w_trav);
+            window_threads[w_trav] = thread(timeout_ack, w_trav, start_g);
             sendto(sock, (const char *)packet.c_str(), packet.length(), MSG_CONFIRM, (const struct sockaddr *)&recvGBN, sizeof(recvGBN));
             cout<<"Packet "<<packet<<" sent"<<endl;
             w_trav++;
         }
-        cout<<"Finished window" << endl;
-        sleep(1);
-        m.lock();
-        while(!window_threads.empty())
+        cout<<"Window Complete Data" << endl;
+        while(1)
         {
-            window_threads.begin()->second.join();
-            window_threads.erase(window_threads.begin());
+            m.lock();
+            if(timeout_check)   //Deal with error
+            {
+                m.lock();
+                w_trav = LFT + 1;
+                timeout_check = false;
+                for(int i = LFT + 1; i < window_size; i++)
+                {
+                    window_threads[i].detach();
+                    window_threads.erase(i);
+                }
+                m.unlock();
+                break;
+            }
+            if(LFT == window_size - 1)
+            {
+                LFT = -1;
+                if(window_threads.size() == 0) cout << "All threads detached";
+                cout<<"------------------------------------"<<endl;
+                m.unlock();
+                break;
+            }
+            m.unlock();
         }
+        m.lock();
         start_g = start_g + w_trav;
         end_g = start_g + window_size;
         m.unlock();
