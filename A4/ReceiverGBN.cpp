@@ -60,20 +60,24 @@ int main()
         int seq_num = stoi(temp_buf.substr(0, pos));
         temp_buf = temp_buf.substr(pos+1, temp_buf.length());
 
-        cout<<"Seq No: "<<seq_num<<" NFE: "<<NFE<<" ";
-        cout<<"Packet : "<< temp_buf<<endl;
-        
-
+        cout<<"Seq, NFE, temp_buf: "<<seq_num<<" "<<NFE<<" "<<temp_buf<<endl;
         // Random Packet Drop 
         
+        /*
         float temp_num = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-        //if(temp_num < random_drop_prob)
-        //   continue;
-
+        if(temp_num < random_drop_prob)
+        {
+            cout << "Packet drop random" << endl;
+            continue;
+        }
+        */
 
         // Drop the packet if it is not the next frame expected
         if(seq_num != NFE)
+        {
+            cout << "Packet drop NFE" << endl;
             continue;
+        }
 
         // If debug mode is on, print the received packet
         if(debug)
