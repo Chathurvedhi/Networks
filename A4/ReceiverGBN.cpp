@@ -12,6 +12,8 @@ using namespace std;
 #define MAX_LINE 1024
 #define localhost "127.0.0.1"
 
+// New system check
+
 int main()
 {
     srand(time(0));
