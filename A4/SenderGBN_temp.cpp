@@ -12,22 +12,90 @@ using namespace std;
 #define MAX_LINE 1024
 #define localhost "127.0.0.1"
 
-string packet;
+//Constant variables for GBN
+float packet_gen_rate = 2; 
+int max_buffer_size = 10;
 int packet_len = 10;
+int window_size = 5;
+float timeout = 4000;                        // in ms
 
-void packet_generator()
+//Variables for GBN
+int start_g = 0;
+int end_g = window_size;
+queue<string> packet_buffer;
+bool timeout_check = false;
+int prev_LFT = -1;
+int LFT = -1;
+unordered_map<int, thread> window_threads;
+unordered_map<int, bool> thread_kills;
+
+//Mutex for synchronization
+mutex m;
+
+void packet_creation()
 {
-    packet = "";
-    for(int j = 0; j < packet_len; j++)
+    int pack_num = 0;
+    while(1)
     {
-        packet += (char)(rand()%26 + 'a');
+        if(packet_buffer.size() == max_buffer_size)
+            continue;
+        string packet = "";
+        for(int j = 0; j < packet_len; j++)
+        {
+            packet += (char)(rand()%26 + 'a');
+        }
+        char temp_seq_no = char(pack_num);
+        packet = temp_seq_no + packet;
+        m.lock();
+        packet_buffer.push(packet);
+        m.unlock();
+        pack_num = (pack_num + 1)%256;
+        usleep(1000000/packet_gen_rate);
     }
-    int seq_num = 0;
-    char seq_enc = (char)seq_num;
-    packet = seq_enc + packet;
 }
 
-void connect()
+void timeout_ack(int seq_no, int start_val)
+{
+    usleep(timeout*1000);
+    m.lock();
+    if(thread_kills[seq_no + start_val])
+    {
+        //delete thread_kills key value seq_no + start_val
+        thread_kills.erase(seq_no + start_val);
+        m.unlock();
+        return;
+    }
+    cout<<"Timeout for packet "<<seq_no << "Start val " << start_val <<endl;
+    timeout_check = true;
+    m.unlock();
+}
+
+void packet_ack(int sock, struct sockaddr_in &sendGBN, socklen_t &len)
+{
+    while(1)
+    {
+        char buffer[MAX_LINE] = {0};
+        recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, (socklen_t *) &len);
+        m.lock();
+        cout<<"Received ack for packet "<<buffer<<endl;
+        if(stoi(buffer) > LFT)
+        {
+            prev_LFT = LFT;
+            LFT = stoi(buffer) - start_g;
+            // Detach all threads till LFT
+            for(int i = prev_LFT + 1; i <= LFT; i++)
+            {
+                thread_kills[i + start_g] = true;
+                window_threads[i].detach();
+                window_threads.erase(i);
+            }
+        }
+        m.unlock();
+    }
+}
+
+
+void packet_sender()
 {
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
     if(sock < 0)
@@ -36,8 +104,8 @@ void connect()
         exit(0);
     }
     struct sockaddr_in recvGBN, sendGBN;
-    memset(&recvGBN, 0, sizeof(recvGBN));   //Receiver Server
-
+    memset(&recvGBN, 0, sizeof(recvGBN));
+    
     // Filling server information
     recvGBN.sin_family = AF_INET;
     recvGBN.sin_port = htons(port_no);
@@ -45,16 +113,83 @@ void connect()
 
     char buffer[MAX_LINE] = {0};
     socklen_t len;
-    packet_generator();
-    sendto(sock, (const char *)packet.c_str(), packet.length(), MSG_CONFIRM, (const struct sockaddr *)&recvGBN, sizeof(recvGBN));
-    cout<<"Packet "<<packet<<" sent"<<endl;
-    recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, &len);
-    cout<<"Ack:" << int(buffer[0]) << " received"<<endl;
+    thread packet_ack_thread(packet_ack, sock, ref(sendGBN), ref(len));
+    while(1)
+    {   
+        int w_trav = 0;
+        while(w_trav < window_size)
+        {
+            m.lock();
+            bool temp = packet_buffer.empty();
+            m.unlock();
+            if(temp) continue;
+            m.lock();
+            if(timeout_check)   //Deal with error
+            {
+                m.lock();
+                w_trav = LFT + 1;
+                timeout_check = false;
+                for(int i = LFT + 1; i < window_size; i++)
+                {
+                    window_threads[i].detach();
+                    window_threads.erase(i);
+                }
+                m.unlock();
+                break;
+            }
+            string packet = packet_buffer.front();
+            packet_buffer.pop();
+            m.unlock();
+            window_threads[w_trav] = thread(timeout_ack, w_trav, start_g);
+            sendto(sock, (const char *)packet.c_str(), packet.length(), MSG_CONFIRM, (const struct sockaddr *)&recvGBN, sizeof(recvGBN));
+            cout<<"Packet "<<packet<<" sent"<<endl;
+            w_trav++;
+        }
+        while(1)
+        {
+            m.lock();
+            if(timeout_check)   //Deal with error
+            {
+                m.lock();
+                w_trav = LFT + 1;
+                timeout_check = false;
+                for(int i = LFT + 1; i < window_size; i++)
+                {
+                    window_threads[i].detach();
+                    window_threads.erase(i);
+                }
+                m.unlock();
+                break;
+            }
+            if(LFT == window_size - 1)
+            {
+                LFT = -1;
+                cout<<"------------------------------------"<<endl;
+                m.unlock();
+                break;
+            }
+            m.unlock();
+        }
+        m.lock();
+        start_g = start_g + w_trav;
+        end_g = start_g + window_size;
+        m.unlock();
+    }   
+    packet_ack_thread.join();
 }
 
 int main()
 {
+    // Sender GBN as UDP Client
+    // One thread for creating packets and storing them in a buffer
+    // The other for sending packets and acknowledgements of ACKs
+
     srand(time(0));
 
-    connect();
+    thread packetcreation_thread(packet_creation);
+    thread packetsend_thread(packet_sender);
+
+    packetcreation_thread.join();
+    packetsend_thread.join();
 }
+
