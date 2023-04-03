@@ -1,4 +1,4 @@
-#include<bits/stdc++.h>
+#include <bits/stdc++.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -13,19 +13,21 @@ using namespace std;
 #define localhost "127.0.0.1"
 
 //Constant variables for GBN
-float packet_gen_rate = 10; 
+float packet_gen_rate = 2; 
 int max_buffer_size = 10;
 int packet_len = 10;
-int window_size = 10;
+int window_size = 5;
 float timeout = 4000;                        // in ms
 
 //Variables for GBN
 int start_g = 0;
 int end_g = window_size;
 queue<string> packets;
-int timeout_val = -1;
 bool timeout_check = false;
+int prev_LFT = -1;
 int LFT = -1;
+unordered_map<int, thread> window_threads;
+unordered_map<int, bool> thread_kills;
 
 //Mutex for synchronization
 mutex m;
@@ -50,7 +52,6 @@ void packet_creation()
     int pack_num = 0;
     while(1)
     {
-        //cout<<"creating packets"<<packets.size()<<endl;
         if(packets.size() == max_buffer_size)
             continue;
         string packet = "";
@@ -67,15 +68,19 @@ void packet_creation()
     }
 }
 
-void timeout_ack(int seq_no)
+void timeout_ack(int seq_no, int start_val)
 {
     usleep(timeout*1000);
     m.lock();
-    if(seq_no >= LFT + 1)
+    if(thread_kills[seq_no + start_val])
     {
-        timeout_check = true;
-        timeout_val = LFT + 1;
+        //delete thread_kills key value seq_no + start_val
+        thread_kills.erase(seq_no + start_val);
+        m.unlock();
+        return;
     }
+    cout<<"Timeout for packet "<<seq_no << "Start val " << start_val <<endl;
+    timeout_check = true;
     m.unlock();
 }
 
@@ -86,9 +91,18 @@ void packet_ack(int sock, struct sockaddr_in &sendGBN, socklen_t &len)
         char buffer[MAX_LINE] = {0};
         recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, (socklen_t *) &len);
         m.lock();
+        cout<<"Received ack for packet "<<buffer<<endl;
         if(stoi(buffer) > LFT)
         {
-            LFT = stoi(buffer);
+            prev_LFT = LFT;
+            LFT = stoi(buffer) - start_g;
+            // Detach all threads till LFT
+            for(int i = prev_LFT + 1; i <= LFT; i++)
+            {
+                thread_kills[i + start_g] = true;
+                window_threads[i].detach();
+                window_threads.erase(i);
+            }
         }
         m.unlock();
     }
@@ -116,41 +130,64 @@ void packet_sender()
     thread packet_ack_thread(packet_ack, sock, ref(sendGBN), ref(len));
     while(1)
     {   
-        cout<<"Start window"<<endl;
-        int w_trav = start_g;
-        vector<thread> window_threads;
-        while(w_trav < end_g)
+        int w_trav = 0;
+        while(w_trav < window_size)
         {
             m.lock();
             bool temp = packets.empty();
             m.unlock();
             if(temp) continue;
-            if(timeout_check)
+            m.lock();
+            if(timeout_check)   //Deal with error
             {
                 m.lock();
-                w_trav = timeout_val;
+                w_trav = LFT + 1;
                 timeout_check = false;
+                for(int i = LFT + 1; i < window_size; i++)
+                {
+                    window_threads[i].detach();
+                    window_threads.erase(i);
+                }
                 m.unlock();
                 break;
             }
-            cout<<"Window traversal"<<endl;
-            m.lock();
             string packet = packets.front();
             packets.pop();
             m.unlock();
+            window_threads[w_trav] = thread(timeout_ack, w_trav, start_g);
             sendto(sock, (const char *)packet.c_str(), packet.length(), MSG_CONFIRM, (const struct sockaddr *)&recvGBN, sizeof(recvGBN));
             cout<<"Packet "<<packet<<" sent"<<endl;
-            window_threads.push_back(thread(timeout_ack, w_trav));
             w_trav++;
         }
-        while(!window_threads.empty())
+        while(1)
         {
-            window_threads.back().detach();
-            window_threads.pop_back();
+            m.lock();
+            if(timeout_check)   //Deal with error
+            {
+                m.lock();
+                w_trav = LFT + 1;
+                timeout_check = false;
+                for(int i = LFT + 1; i < window_size; i++)
+                {
+                    window_threads[i].detach();
+                    window_threads.erase(i);
+                }
+                m.unlock();
+                break;
+            }
+            if(LFT == window_size - 1)
+            {
+                LFT = -1;
+                cout<<"------------------------------------"<<endl;
+                m.unlock();
+                break;
+            }
+            m.unlock();
         }
-        cout<<"Finished window" << endl;
-        start_g = w_trav;
+        m.lock();
+        start_g = start_g + w_trav;
         end_g = start_g + window_size;
+        m.unlock();
     }   
     packet_ack_thread.join();
 }
