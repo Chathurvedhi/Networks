@@ -22,7 +22,7 @@ float timeout = 4000;                        // in ms
 //Variables for GBN
 int start_g = 0;
 int end_g = window_size;
-queue<string> packets;
+queue<string> packet_buffer;
 bool timeout_check = false;
 int prev_LFT = -1;
 int LFT = -1;
@@ -32,38 +32,24 @@ unordered_map<int, bool> thread_kills;
 //Mutex for synchronization
 mutex m;
 
-void packet_creation_temp()
-{
-    int i = 0;
-    for(int i = 0; i < 10; i++)
-    {
-        string packet = "";
-        for(int j = 0; j < packet_len; j++)
-        {
-            packet += (char)(rand()%26 + 'a');
-        }
-        packet = to_string(i) + "|" + packet;
-        packets.push(packet);
-    }
-}
-
 void packet_creation()
 {
     int pack_num = 0;
     while(1)
     {
-        if(packets.size() == max_buffer_size)
+        if(packet_buffer.size() == max_buffer_size)
             continue;
         string packet = "";
         for(int j = 0; j < packet_len; j++)
         {
             packet += (char)(rand()%26 + 'a');
         }
-        packet = to_string(pack_num) + "|" + packet;
+        char temp_seq_no = char(pack_num);
+        packet = temp_seq_no + packet;
         m.lock();
-        packets.push(packet);
+        packet_buffer.push(packet);
         m.unlock();
-        pack_num++;
+        pack_num = (pack_num + 1)%256;
         usleep(1000000/packet_gen_rate);
     }
 }
@@ -134,7 +120,7 @@ void packet_sender()
         while(w_trav < window_size)
         {
             m.lock();
-            bool temp = packets.empty();
+            bool temp = packet_buffer.empty();
             m.unlock();
             if(temp) continue;
             m.lock();
@@ -151,8 +137,8 @@ void packet_sender()
                 m.unlock();
                 break;
             }
-            string packet = packets.front();
-            packets.pop();
+            string packet = packet_buffer.front();
+            packet_buffer.pop();
             m.unlock();
             window_threads[w_trav] = thread(timeout_ack, w_trav, start_g);
             sendto(sock, (const char *)packet.c_str(), packet.length(), MSG_CONFIRM, (const struct sockaddr *)&recvGBN, sizeof(recvGBN));
@@ -200,7 +186,6 @@ int main()
 
     srand(time(0));
 
-    //packet_creation_temp();
     thread packetcreation_thread(packet_creation);
     thread packetsend_thread(packet_sender);
 

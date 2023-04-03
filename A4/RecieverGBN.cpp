@@ -56,13 +56,15 @@ int main()
         int n = recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, &len);
         buffer[n] = '\0';
 
-        // Split buffer by '|' to get the sequence number and the packet
-        string temp_buf(buffer);
-        int pos = temp_buf.find("|");
-        int seq_num = stoi(temp_buf.substr(0, pos));
-        temp_buf = temp_buf.substr(pos+1, temp_buf.length());
-
-        cout<<"Seq, NFE, temp_buf: "<<seq_num<<" "<<NFE<<" "<<temp_buf<<endl;
+        // First byte is the sequence number rest is packet
+        int seq_num = buffer[0];
+        string packet = "";
+        for(int i = 1; i < n; i++)
+        {
+            packet += buffer[i];
+        }
+        
+        cout<<"Seq, NFE, packet: "<<seq_num<<" "<<NFE<<" "<<packet<<endl;
         // Random Packet Drop 
         
         /*
