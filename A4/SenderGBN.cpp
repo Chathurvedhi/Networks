@@ -1,3 +1,13 @@
+// NAME: Chathurvedhi Talapaneni
+// Roll Number: CS20B021
+// Course: CS3205 Jan. 2023 semester
+// Lab number: 4
+// Date of submission: 05/04/2023
+// I confirm that the source file is entirely written by me without
+// resorting to any dishonest means.
+// Website(s) that I used for basic socket programming code are:
+// URL(s):
+
 #include <bits/stdc++.h>
 #include <sys/types.h>
 #include <sys/socket.h>
