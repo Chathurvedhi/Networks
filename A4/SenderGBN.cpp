@@ -29,6 +29,7 @@ bool timeout_check = false;
 int prev_LFT = -1;
 int LFT = -1;
 unordered_map<int, thread> window_threads;
+thread timeout_thread;
 unordered_map<int, int> thread_kills;
 int win_trav = 0;
 
@@ -55,6 +56,7 @@ void packet_generator()
     }
 }
 
+
 void thread_detach(int seq_num)
 {
     timeout_check = true;
@@ -62,11 +64,13 @@ void thread_detach(int seq_num)
     for(int i = LFT + 1; i < window_size; i++)
     {
         // if window_threads[i] is present then detach it
+        /*
         if(window_threads.find(i) != window_threads.end())
         {
             window_threads[i].detach();
             window_threads.erase(i);
         }
+        */
         if(i != seq_num)
         {
             if(thread_kills.find(i + start) != thread_kills.end()) thread_kills[i + start]++;
@@ -121,7 +125,9 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
                 packet_buffer.pop();
                 packet_window.push_back(packet);
             }
-            window_threads[win_trav] = thread(timeout_ack, win_trav, start);
+            //window_threads[win_trav] = thread(timeout_ack, win_trav, start);
+            timeout_thread = thread(timeout_ack, win_trav, start);
+            timeout_thread.detach();
             m.unlock();
             sendto(sock, (const char *)packet.c_str(), packet.length(), MSG_CONFIRM, (const struct sockaddr *)&recvGBN, len);
             string data = packet.substr(1, packet.length() - 1);
@@ -142,11 +148,13 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
                 packet_window.clear();
                 for(int i = 0; i < window_size; i++)
                 {
+                    /*
                     if(window_threads.find(i) != window_threads.end())
                     {
                         window_threads[i].detach();
                         window_threads.erase(i);
                     }
+                    */
                 }
                 cout<<"--------------------------" << endl;
                 m.unlock();
@@ -178,8 +186,10 @@ void ack_receiver(int sock, struct sockaddr_in &sendGBN, socklen_t &len)
             {
                 if(thread_kills.find(i + start) != thread_kills.end()) thread_kills[i + start]++;
                 else thread_kills[i + start] = 1;
+                /*
                 window_threads[i].detach();
                 window_threads.erase(i);
+                */
                 cout<< "Detached thread " << i + start << endl;
             }
         }

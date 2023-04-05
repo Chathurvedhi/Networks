@@ -49,6 +49,7 @@ int main()
 
     auto start = chrono::high_resolution_clock::now(); //Start time
 
+    int drop_num = 4;
     for(int i_t = 0; i_t < max_packets; i_t++)
     {
         // Receive the packet
@@ -75,6 +76,13 @@ int main()
             continue;
         }
         */
+
+        if( seq_num == drop_num)
+        {
+            cout << "Packet drop 4" << endl;
+            drop_num = drop_num + 13;
+            continue;
+        }
 
         // Drop the packet if it is not the next frame expected
         if(seq_num != NFE)
