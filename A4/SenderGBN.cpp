@@ -30,9 +30,14 @@ int prev_LFT = -1;
 int LFT = -1;
 thread timeout_thread;
 unordered_map<int, bool> thread_kills;
+unordered_map<int, int> transmit_count;
 int win_trav = 0;
 int window_count = 0;
 
+void exit_function()
+{
+    exit(0);
+}
 
 void packet_generator()
 {
@@ -72,6 +77,7 @@ void timeout_ack(int seq_no, int start_val, int win)
         return;
     }
     cout << "Timeout for packet " << seq_no + start_val << " " << win << endl;
+    window_count++;
     timeout_check = true;
     // Remove packets from 0 to LFT from packet_window
     for(int i = 0; i <= LFT; i++)
@@ -110,6 +116,12 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
             timeout_thread.detach();
             m.unlock();
             sendto(sock, (const char *)packet.c_str(), packet.length(), MSG_CONFIRM, (const struct sockaddr *)&recvGBN, len);
+            transmit_count[win_trav + start]++;
+            if(transmit_count[win_trav + start] >= 5)
+            {
+                cout << "Max Retransmit" << endl;
+                exit_function();
+            }
             string data = packet.substr(1, packet.length() - 1);
             cout<<"Packet sent "<< int(packet[0]) << " " << data << endl;
             win_trav++;
@@ -120,7 +132,6 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
             if(timeout_check)
             {
                 timeout_check = false;
-                window_count++;
                 m.unlock();
                 break;
             }
@@ -148,8 +159,13 @@ void ack_receiver(int sock, struct sockaddr_in &sendGBN, socklen_t &len)
     {
         char buffer[MAX_LINE] = {0};
         recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, (socklen_t *) &len);
-        cout<<"Ack received "<<stoi(buffer)<<endl;
         m.lock();
+        cout<<"Ack received "<<buffer<<endl;
+        if(buffer[0] == 'E')
+        {
+            cout << "END msg recieved" << endl;
+            exit_function();
+        }
         if(stoi(buffer) > LFT)
         {
             prev_LFT = LFT;
@@ -192,6 +208,8 @@ void GBN_connect()
 int main()
 {
     srand(time(0));
+
+    auto start = chrono::high_resolution_clock::now();
 
     thread packet_gen_thread(packet_generator);
     thread GBN_connect_thread(GBN_connect);

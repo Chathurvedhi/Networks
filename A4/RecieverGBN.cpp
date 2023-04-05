@@ -41,9 +41,9 @@ int main()
     }
 
     int NFE = 0;                            //Next Frame Expected
-    float random_drop_prob = 0.1;           //Probability of dropping a packet
+    float random_drop_prob = 0;           //Probability of dropping a packet
     int max_packets = 100;                  //Maximum number of packets to be received
-    bool debug = false;                     //Debug mode
+    bool debug = true;                     //Debug mode
     socklen_t len;
     len = sizeof(sendGBN);
 
@@ -81,7 +81,7 @@ int main()
             continue;
         }
 
-        cout<<"Seq, NFE, packet: "<<seq_num<<" "<<NFE<<" "<<packet<<endl;
+        //cout<<"Seq packet: "<<seq_num<<" "<<NFE<<" "<<packet<<endl;
 
 
         // If debug mode is on, print the received packet
@@ -94,13 +94,13 @@ int main()
             micro = micro%1000;
             cout<<"Seq No: "<<seq_num<< "  ";
             cout<<"Time: " << milli << ":" << micro << "  ";
-            cout<<"Packet dropped: False "<<buffer<<endl;
+            cout<<"Packet dropped: False "<<endl;
         }
 
         // Send ACK
         string ack = to_string(seq_num);
         sendto(sock, ack.c_str(), ack.length(), MSG_CONFIRM, (const struct sockaddr *)&sendGBN, len);
-        cout<<"ACK sent: "<<ack<<endl;
+        //cout<<"ACK sent: "<<ack<<endl;
        
         // Increment NFE and packets received
         NFE = (NFE + 1);
@@ -110,6 +110,7 @@ int main()
             string ack = "END";
             sendto(sock, ack.c_str(), ack.length(), MSG_CONFIRM, (const struct sockaddr *)&sendGBN, len);
             cout<<"End signal Sent" << endl;
+            break;
         }
     }
 }
