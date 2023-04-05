@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
     srand(time(0));
 
     float random_drop_prob = 0.00001;       //Probability of dropping a packet
-    int max_packets = 1000;                  //Maximum number of packets to be received
+    int max_packets = 100;                  //Maximum number of packets to be received
     bool debug = false;                     //Debug mode
 
     for(int i = 1; i < argc; i++)

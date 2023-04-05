@@ -18,7 +18,7 @@ int window_size = 3;
 float timeout = 100000;
 bool debug = false;
 int port_no = 20020;
-int max_packets = 1000;
+int max_packets = 100;
 string ip_val =  "127.0.0.1";
 
 mutex m;
