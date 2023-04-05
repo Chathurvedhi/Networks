@@ -52,7 +52,7 @@ int trans_count = 0;
 int ack_count = 0;
 bool empty_window = false;
 
-void exit_function()
+void exit_function()            // Called when Sender is terminated
 {
     cout << "Packet_gen_rate : " << gen_rate << endl;
     cout << "Packet_len : " << packet_len << endl;
@@ -61,12 +61,12 @@ void exit_function()
     exit(0);
 }
 
-void packet_generator()
+void packet_generator()     // Thread to generate packets
 {
     int seq_no = 0;
     while (1)
     {
-        if (packet_buffer.size() == buffer_size)
+        if (packet_buffer.size() == buffer_size)    // If buffer is full, wait
             continue;
         string packet = "";
         for (int i = 0; i < packet_len; i++)
@@ -74,15 +74,15 @@ void packet_generator()
             packet += (char)(rand() % 26 + 'a');
         }
         char temp_seq_no = char(seq_no);
-        packet = temp_seq_no + packet;
+        packet = temp_seq_no + packet;              // Add sequence number to the packet
         m.lock();
         packet_buffer.push(packet);
         m.unlock();
         seq_no ++;
-        if(seq_no == 256)
+        if(seq_no == 256)                           // For remapping sequence numbers to start from 0
         {
             seq_no = 0;
-            for(int i = 0; i < 256 - window_size; i++)
+            for(int i = 0; i < 256 - window_size; i++)      //Cleaning the variables for new remapping
             {
                 empty_window = true;
                 thread_kills[i] = false;
@@ -97,21 +97,21 @@ void packet_generator()
 
 void timeout_ack(int seq_no, int start_val, int win)
 {
-    usleep(timeout);
+    usleep(timeout);                            // Wait for timeout for individual packet
     m.lock();
-    if(win != window_count)
+    if(win != window_count)                     // Wrong window, timeout pointless
     {
         m.unlock();
         return;
     }
-    if(thread_kills[(seq_no + start_val)%256])
+    if(thread_kills[(seq_no + start_val)%256])  // Packet recived
     {
         m.unlock();
         return;
     }
-    window_count++;
+    window_count++;                             // New window to stop all previous window timers
     timeout_check = true;
-    for(int i = 0; i <= LFT; i++)
+    for(int i = 0; i <= LFT; i++)               // Clean window of packets
     {
         packet_window.erase(packet_window.begin());
     }
@@ -124,54 +124,54 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
     while(1)
     {
         win_trav = 0;
-        while(win_trav < window_size)
+        while(win_trav < window_size)           // Each window
         {   
-            if(timeout_check) break;
+            if(timeout_check) break;            // Timeout occured
             m.lock();
             bool temp = packet_buffer.empty();
             m.unlock();
             if(temp) continue;
             m.lock();
             string packet;
-            if(win_trav < packet_window.size())
+            if(win_trav < packet_window.size()) // Retransmitting packets
             {   
                 packet = packet_window[win_trav];
             }
-            else
-            {
+            else                                // New packets
+            {   
                 packet = packet_buffer.front();
                 packet_buffer.pop();
                 packet_window.push_back(packet);
             }
             sendto(sock, (const char *)packet.c_str(), packet.length(), MSG_CONFIRM, (const struct sockaddr *)&recvGBN, len);
-            trans_count++;
+            trans_count++;                      // Incrementing transmission count
             auto temp_time = chrono::high_resolution_clock::now();
             //Time in microseconds
             long time = chrono::duration_cast<chrono::microseconds>(temp_time.time_since_epoch()).count();
-            RTT_start[(win_trav + start)%256] = time;
+            RTT_start[(win_trav + start)%256] = time;       // Storing start time for RTT calculation
             transmit_count[(win_trav + start)%256]++;
-            if(transmit_count[(win_trav + start)%256] >= 5)
+            if(transmit_count[(win_trav + start)%256] >= 5) // Max retransmit check
             {
                 cout << "Max Retransmit" << endl;
                 exit_function();
             }
-            timeout_thread = thread(timeout_ack, win_trav, start, window_count);
+            timeout_thread = thread(timeout_ack, win_trav, start, window_count);    // Starting timeout thread
             timeout_thread.detach();
             win_trav++;
             m.unlock();
         }
-        while(1)
+        while(1)                                // Wait for all packets to be acked or timeout
         {
             m.lock();
-            if(timeout_check)
+            if(timeout_check)                   // Timeout occured
             {
                 timeout_check = false;
                 m.unlock();
                 break;
             }
-            if(LFT == window_size - 1)
+            if(LFT == window_size - 1)          // All packets acked
             {
-                packet_window.clear();
+                packet_window.clear();          // Clear window
                 window_count++;
                 m.unlock();
                 break;
@@ -179,7 +179,7 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
             m.unlock();
         }
         m.lock();
-        if(empty_window)
+        if(empty_window)                        // Remapping sequence numbers
         {
             empty_window = false;
             for(int i = LFT + 1; i<256; i++)
@@ -189,7 +189,7 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
                 RTT_start[i] = 0;
             }
         }
-        start = start + LFT + 1;
+        start = (start + LFT + 1)%256;          // Resetting start value
         LFT = -1;
         prev_LFT = -1;
         m.unlock();
@@ -198,12 +198,12 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
 
 void ack_receiver(int sock, struct sockaddr_in &sendGBN, socklen_t &len, long time_micro)
 {
-    while(1)
+    while(1)                                    // Recieve acks
     {
         char buffer[MAX_LINE] = {0};
-        recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, (socklen_t *) &len);
+        recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, (socklen_t *) &len); 
         m.lock();
-        if(buffer[0] == 'E')
+        if(buffer[0] == 'E')                    // End message
         {
             cout << "END msg recieved" << endl;
             exit_function();
@@ -211,25 +211,25 @@ void ack_receiver(int sock, struct sockaddr_in &sendGBN, socklen_t &len, long ti
         auto temp_time = chrono::high_resolution_clock::now();
         //Time in microseconds
         long time = chrono::duration_cast<chrono::microseconds>(temp_time.time_since_epoch()).count();
-        long RTT = time - RTT_start[stoi(buffer)];
+        long RTT = time - RTT_start[stoi(buffer)];  // Calculating RTT
         RTT_avg = RTT_avg * stoi(buffer) + RTT;
-        RTT_avg = RTT_avg / (stoi(buffer) + 1);
-        RTT_start[stoi(buffer) ] -= time_micro; 
-        if(debug)
+        RTT_avg = RTT_avg / (stoi(buffer) + 1);     // Calculating average RTT
+        RTT_start[stoi(buffer) ] -= time_micro;     // Adjusting start time for RTT calculation
+        if(debug)                                   // Debug RTT calculation
         {
             cout << "Seq #: " << buffer << " Time Generated: " << RTT_start[stoi(buffer)]/1000 << ":" << RTT_start[stoi(buffer)]%1000 << " RTT: " << RTT << " Number of Attempts: " << transmit_count[stoi(buffer)] << endl;
         }
-        ack_count = max(ack_count, stoi(buffer) + 1);
-        if(ack_count == max_packets)
+        ack_count = max(ack_count, stoi(buffer) + 1);   // Incrementing ack count
+        if(ack_count == max_packets)                    // Max packets received exit call
         {
-            cout << "All packets received" << endl;
+            cout << "Max packets received" << endl;
             exit_function();
         }
-        if(ack_count > 10)
+        if(ack_count > 10)                              // Adjusting timeout after 10 packets
         {
             timeout = 2 * RTT_avg;
         }
-        if(stoi(buffer) >= (LFT + start+1)%256)
+        if(stoi(buffer) >= (LFT + start+1)%256)         // New ack and update LFT
         {
             prev_LFT = LFT;
             LFT = (stoi(buffer) - start)%256;
@@ -249,7 +249,7 @@ void ack_receiver(int sock, struct sockaddr_in &sendGBN, socklen_t &len, long ti
 
 void GBN_connect()
 {
-    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);      // Creating socket
     if(sock < 0)
     {
         cout<<"Socket creation failed"<<endl;
@@ -267,11 +267,11 @@ void GBN_connect()
     socklen_t len_ack;
     socklen_t len_packet = sizeof(recvGBN);
 
-    auto start_time = chrono::high_resolution_clock::now();
+    auto start_time = chrono::high_resolution_clock::now();     // Time in microseconds for relative time
     long time_micro = chrono::duration_cast<chrono::microseconds>(start_time.time_since_epoch()).count();
 
-    thread packet_send_thread(packet_sender, sock, ref(recvGBN), ref(len_packet));
-    thread ack_recv_thread(ack_receiver, sock, ref(sendGBN), ref(len_ack), time_micro);
+    thread packet_send_thread(packet_sender, sock, ref(recvGBN), ref(len_packet));      // Starting packet sender thread
+    thread ack_recv_thread(ack_receiver, sock, ref(sendGBN), ref(len_ack), time_micro); // Starting ack receiver thread
 
     packet_send_thread.join();
     ack_recv_thread.join();
@@ -281,7 +281,7 @@ int main(int argc, char *argv[])
 {
     srand(time(0));
 
-    for(int i=1; i<argc; i++)
+    for(int i=1; i<argc; i++)               // Parsing command line arguments
     {
         if(strcmp(argv[i], "-p") == 0)
         {
@@ -317,8 +317,8 @@ int main(int argc, char *argv[])
         }
     }
 
-    thread packet_gen_thread(packet_generator);
-    thread GBN_connect_thread(GBN_connect);
+    thread packet_gen_thread(packet_generator);     // Starting packet generator thread
+    thread GBN_connect_thread(GBN_connect);         // Starting GBN connection thread
 
     packet_gen_thread.join();
     GBN_connect_thread.join();
