@@ -41,7 +41,7 @@ int main()
     }
 
     int NFE = 0;                            //Next Frame Expected
-    float random_drop_prob = 0.2;           //Probability of dropping a packet
+    float random_drop_prob = 0.1;           //Probability of dropping a packet
     int max_packets = 100;                  //Maximum number of packets to be received
     bool debug = false;                     //Debug mode
     socklen_t len;
@@ -50,7 +50,7 @@ int main()
     auto start = chrono::high_resolution_clock::now(); //Start time
 
     int drop_num = 4;
-    for(int i_t = 0; i_t < max_packets; i_t++)
+    while(1)
     {
         // Receive the packet
         char buffer[MAX_LINE] = {0};
@@ -65,31 +65,24 @@ int main()
             packet += buffer[i];
         }
         
-        cout<<"Seq, NFE, packet: "<<seq_num<<" "<<NFE<<" "<<packet<<endl;
-        // Random Packet Drop 
-        
-        /*
-        float temp_num = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-        if(temp_num < random_drop_prob)
-        {
-            cout << "Packet drop random" << endl;
-            continue;
-        }
-        */
-
-        if( seq_num == drop_num)
-        {
-            cout << "Packet drop 4" << endl;
-            drop_num = drop_num + 13;
-            continue;
-        }
-
         // Drop the packet if it is not the next frame expected
         if(seq_num != NFE)
         {
-            cout << "Packet drop NFE" << endl;
+            cout << seq_num << " ";
             continue;
         }
+        
+        // Random Packet Drop 
+        float temp_num = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+        if(temp_num < random_drop_prob)
+        {
+            cout << "Packet drop random " << seq_num << endl;
+            cout << "NFE drops :";
+            continue;
+        }
+
+        cout<<"Seq, NFE, packet: "<<seq_num<<" "<<NFE<<" "<<packet<<endl;
+
 
         // If debug mode is on, print the received packet
         if(debug)
@@ -111,5 +104,12 @@ int main()
        
         // Increment NFE and packets received
         NFE = (NFE + 1);
+        max_packets--;
+        if(max_packets == 0)
+        {
+            string ack = "END";
+            sendto(sock, ack.c_str(), ack.length(), MSG_CONFIRM, (const struct sockaddr *)&sendGBN, len);
+            cout<<"End signal Sent" << endl;
+        }
     }
 }

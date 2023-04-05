@@ -28,10 +28,10 @@ int start = 0;
 bool timeout_check = false;
 int prev_LFT = -1;
 int LFT = -1;
-unordered_map<int, thread> window_threads;
 thread timeout_thread;
-unordered_map<int, int> thread_kills;
+unordered_map<int, bool> thread_kills;
 int win_trav = 0;
+int window_count = 0;
 
 
 void packet_generator()
@@ -57,46 +57,27 @@ void packet_generator()
 }
 
 
-void thread_detach(int seq_num)
+void timeout_ack(int seq_no, int start_val, int win)
 {
-    timeout_check = true;
-    // Detach all threads from LFT + 1 to window_size
-    for(int i = LFT + 1; i < window_size; i++)
+    usleep(timeout * 1000);
+    m.lock();
+    if(win != window_count)
     {
-        // if window_threads[i] is present then detach it
-        /*
-        if(window_threads.find(i) != window_threads.end())
-        {
-            window_threads[i].detach();
-            window_threads.erase(i);
-        }
-        */
-        if(i != seq_num)
-        {
-            if(thread_kills.find(i + start) != thread_kills.end()) thread_kills[i + start]++;
-            else thread_kills[i + start] = 1;
-        }
+        m.unlock();
+        return;
     }
+    if(thread_kills[seq_no + start_val])
+    {
+        m.unlock();
+        return;
+    }
+    cout << "Timeout for packet " << seq_no + start_val << " " << win << endl;
+    timeout_check = true;
     // Remove packets from 0 to LFT from packet_window
     for(int i = 0; i <= LFT; i++)
     {
         packet_window.erase(packet_window.begin());
     }
-}
-
-void timeout_ack(int seq_no, int start_val)
-{
-    usleep(timeout * 1000);
-    m.lock();
-    if(thread_kills[seq_no + start_val] > 0)
-    {
-        thread_kills[seq_no + start_val]--;
-        if(thread_kills[seq_no + start_val] == 0) thread_kills.erase(seq_no + start_val);
-        m.unlock();
-        return;
-    }
-    cout << "Timeout for packet " << seq_no + start_val << endl;
-    thread_detach(seq_no + start_val);
     m.unlock();
 }
 
@@ -125,8 +106,7 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
                 packet_buffer.pop();
                 packet_window.push_back(packet);
             }
-            //window_threads[win_trav] = thread(timeout_ack, win_trav, start);
-            timeout_thread = thread(timeout_ack, win_trav, start);
+            timeout_thread = thread(timeout_ack, win_trav, start, window_count);
             timeout_thread.detach();
             m.unlock();
             sendto(sock, (const char *)packet.c_str(), packet.length(), MSG_CONFIRM, (const struct sockaddr *)&recvGBN, len);
@@ -140,23 +120,15 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
             if(timeout_check)
             {
                 timeout_check = false;
+                window_count++;
                 m.unlock();
                 break;
             }
             if(LFT == window_size - 1)
             {
                 packet_window.clear();
-                for(int i = 0; i < window_size; i++)
-                {
-                    /*
-                    if(window_threads.find(i) != window_threads.end())
-                    {
-                        window_threads[i].detach();
-                        window_threads.erase(i);
-                    }
-                    */
-                }
                 cout<<"--------------------------" << endl;
+                window_count++;
                 m.unlock();
                 break;
             }
@@ -184,13 +156,7 @@ void ack_receiver(int sock, struct sockaddr_in &sendGBN, socklen_t &len)
             LFT = stoi(buffer) - start;
             for(int i = prev_LFT + 1; i <= LFT; i++)
             {
-                if(thread_kills.find(i + start) != thread_kills.end()) thread_kills[i + start]++;
-                else thread_kills[i + start] = 1;
-                /*
-                window_threads[i].detach();
-                window_threads.erase(i);
-                */
-                cout<< "Detached thread " << i + start << endl;
+                thread_kills[i + start] = true;
             }
         }
         m.unlock();
