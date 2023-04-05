@@ -18,6 +18,7 @@ int buffer_size = 10;
 int packet_len = 10;
 int window_size = 10;
 float timeout = 4000;
+bool debug = true;
 
 mutex m;
 
@@ -31,11 +32,20 @@ int LFT = -1;
 thread timeout_thread;
 unordered_map<int, bool> thread_kills;
 unordered_map<int, int> transmit_count;
+// map for RTT times
+unordered_map<int, long> RTT_start;
 int win_trav = 0;
 int window_count = 0;
+long RTT_avg = 0;
+int trans_count = 0;
+int ack_count = 0;
 
 void exit_function()
 {
+    cout << "Packet_gen_rate : " << gen_rate << endl;
+    cout << "Packet_len : " << packet_len << endl;
+    cout << "Average RTT : " << RTT_avg << endl;
+    cout << "Retransmission Ratio : " << float(trans_count) / ack_count << endl;
     exit(0);
 }
 
@@ -112,16 +122,21 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
                 packet_buffer.pop();
                 packet_window.push_back(packet);
             }
-            timeout_thread = thread(timeout_ack, win_trav, start, window_count);
-            timeout_thread.detach();
-            m.unlock();
             sendto(sock, (const char *)packet.c_str(), packet.length(), MSG_CONFIRM, (const struct sockaddr *)&recvGBN, len);
+            trans_count++;
+            auto temp_time = chrono::high_resolution_clock::now();
+            //Time in microseconds
+            long time = chrono::duration_cast<chrono::microseconds>(temp_time.time_since_epoch()).count();
+            RTT_start[win_trav + start] = time;
             transmit_count[win_trav + start]++;
             if(transmit_count[win_trav + start] >= 5)
             {
                 cout << "Max Retransmit" << endl;
                 exit_function();
             }
+            timeout_thread = thread(timeout_ack, win_trav, start, window_count);
+            timeout_thread.detach();
+            m.unlock();
             string data = packet.substr(1, packet.length() - 1);
             cout<<"Packet sent "<< int(packet[0]) << " " << data << endl;
             win_trav++;
@@ -153,19 +168,30 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
     }
 }
 
-void ack_receiver(int sock, struct sockaddr_in &sendGBN, socklen_t &len)
+void ack_receiver(int sock, struct sockaddr_in &sendGBN, socklen_t &len, long time_micro)
 {
     while(1)
     {
         char buffer[MAX_LINE] = {0};
         recvfrom(sock, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&sendGBN, (socklen_t *) &len);
         m.lock();
-        cout<<"Ack received "<<buffer<<endl;
         if(buffer[0] == 'E')
         {
             cout << "END msg recieved" << endl;
             exit_function();
         }
+        auto temp_time = chrono::high_resolution_clock::now();
+        //Time in microseconds
+        long time = chrono::duration_cast<chrono::microseconds>(temp_time.time_since_epoch()).count();
+        long RTT = time - RTT_start[stoi(buffer)];
+        RTT_avg = RTT_avg * stoi(buffer) + RTT;
+        RTT_avg = RTT_avg / (stoi(buffer) + 1);
+        RTT_start[stoi(buffer)] -= time_micro; 
+        if(debug)
+        {
+            cout << "Seq #: " << buffer << " Time Generated: " << RTT_start[stoi(buffer)]/1000 << ":" << RTT_start[stoi(buffer)]%1000 << " RTT: " << RTT << " Number of Retransmissions: " << transmit_count[stoi(buffer)] << endl;
+        }
+        ack_count = max(ack_count, stoi(buffer) + 1);
         if(stoi(buffer) > LFT)
         {
             prev_LFT = LFT;
@@ -198,8 +224,12 @@ void GBN_connect()
     char buffer[MAX_LINE] = {0};
     socklen_t len_ack;
     socklen_t len_packet = sizeof(recvGBN);
+
+    auto start_time = chrono::high_resolution_clock::now();
+    long time_micro = chrono::duration_cast<chrono::microseconds>(start_time.time_since_epoch()).count();
+
     thread packet_send_thread(packet_sender, sock, ref(recvGBN), ref(len_packet));
-    thread ack_recv_thread(ack_receiver, sock, ref(sendGBN), ref(len_ack));
+    thread ack_recv_thread(ack_receiver, sock, ref(sendGBN), ref(len_ack), time_micro);
 
     packet_send_thread.join();
     ack_recv_thread.join();
@@ -209,7 +239,6 @@ int main()
 {
     srand(time(0));
 
-    auto start = chrono::high_resolution_clock::now();
 
     thread packet_gen_thread(packet_generator);
     thread GBN_connect_thread(GBN_connect);

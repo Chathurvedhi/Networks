@@ -41,8 +41,8 @@ int main()
     }
 
     int NFE = 0;                            //Next Frame Expected
-    float random_drop_prob = 0;           //Probability of dropping a packet
-    int max_packets = 100;                  //Maximum number of packets to be received
+    float random_drop_prob = 0.1;           //Probability of dropping a packet
+    int max_packets = 25;                  //Maximum number of packets to be received
     bool debug = true;                     //Debug mode
     socklen_t len;
     len = sizeof(sendGBN);
