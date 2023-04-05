@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
     int max_packets = 100;                  //Maximum number of packets to be received
     bool debug = false;                     //Debug mode
 
-    for(int i = 1; i < argc; i++)
+    for(int i = 1; i < argc; i++)           //Parsing the command line arguments
     {
         if(strcmp(argv[i], "-p") == 0)
         {
@@ -105,9 +105,9 @@ int main(int argc, char *argv[])
         
         // Random Packet Drop 
         float temp_num = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-        if(temp_num < random_drop_prob)
+        if(temp_num < random_drop_prob)             //If random number is less than the probability of dropping a packet
         {
-            if(debug)
+            if(debug)                               //If debug mode is on, print the dropped packet information
             {
                 auto end = chrono::high_resolution_clock::now();
                 auto duration = chrono::duration_cast<chrono::microseconds>(end - start);
@@ -137,11 +137,10 @@ int main(int argc, char *argv[])
         // Send ACK
         string ack = to_string(seq_num);
         sendto(sock, ack.c_str(), ack.length(), MSG_CONFIRM, (const struct sockaddr *)&sendGBN, len);
-        //cout << "ACK sent for packet " << seq_num << endl;
         // Increment NFE and packets received
         NFE = (NFE + 1)%256;
         max_packets--;
-        if(max_packets == 0)
+        if(max_packets == 0)            //If all packets are received, send END signal
         {
             string ack = "END";
             sendto(sock, ack.c_str(), ack.length(), MSG_CONFIRM, (const struct sockaddr *)&sendGBN, len);
