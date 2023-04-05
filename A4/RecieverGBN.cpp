@@ -8,15 +8,39 @@
 
 using namespace std;
 
-#define port_no 20020
+int port_no = 20020;
 #define MAX_LINE 1024
-#define localhost "127.0.0.1"
 
 // New system check pt 2
 
-int main()
+int main(int argc, char *argv[])
 {
     srand(time(0));
+
+    float random_drop_prob = 0.00001;       //Probability of dropping a packet
+    int max_packets = 100;                  //Maximum number of packets to be received
+    bool debug = false;                     //Debug mode
+
+    for(int i = 1; i < argc; i++)
+    {
+        if(strcmp(argv[i], "-p") == 0)
+        {
+            port_no = atoi(argv[i+1]);
+        }
+        else if(strcmp(argv[i], "-d") == 0)
+        {
+            debug = true;
+        }
+        else if(strcmp(argv[i], "-r") == 0)
+        {
+            random_drop_prob = atof(argv[i+1]);
+        }
+        else if(strcmp(argv[i], "-n") == 0)
+        {
+            max_packets = atoi(argv[i+1]);
+        }
+    }
+
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
     if(sock < 0)
     {
@@ -41,9 +65,6 @@ int main()
     }
 
     int NFE = 0;                            //Next Frame Expected
-    float random_drop_prob = 0.00001;       //Probability of dropping a packet
-    int max_packets = 400;                  //Maximum number of packets to be received
-    bool debug = true;                     //Debug mode
     socklen_t len;
     len = sizeof(sendGBN);
 

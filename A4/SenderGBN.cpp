@@ -16,7 +16,7 @@ int buffer_size = 10;
 int packet_len = 512;
 int window_size = 3;
 float timeout = 100000;
-bool debug = true;
+bool debug = false;
 int port_no = 20020;
 int max_packets = 400;
 string ip_val =  "127.0.0.1";
@@ -149,7 +149,6 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
                 cout << "Max Retransmit" << endl;
                 exit_function();
             }
-
             timeout_thread = thread(timeout_ack, win_trav, start, window_count);
             timeout_thread.detach();
             win_trav++;
@@ -218,6 +217,11 @@ void ack_receiver(int sock, struct sockaddr_in &sendGBN, socklen_t &len, long ti
         //thread_kills[stoi(buffer)] = true;
         //cout << "Killed thread " << stoi(buffer) << endl;
         ack_count = max(ack_count, stoi(buffer) + 1);
+        if(ack_count == max_packets)
+        {
+            cout << "All packets received" << endl;
+            exit_function();
+        }
         if(ack_count > 10)
         {
             timeout = 2 * RTT_avg;
@@ -277,7 +281,41 @@ int main(int argc, char *argv[])
 {
     srand(time(0));
 
-
+    for(int i=1; i<argc; i++)
+    {
+        if(strcmp(argv[i], "-p") == 0)
+        {
+            port_no = atoi(argv[i+1]);
+        }
+        else if(strcmp(argv[i], "-s") == 0)
+        {
+            ip_val = argv[i+1];
+        }
+        else if(strcmp(argv[i], "-w") == 0)
+        {
+            window_size = atoi(argv[i+1]);
+        }
+        else if(strcmp(argv[i], "-d") == 0)
+        {
+            debug = true;
+        }
+        else if(strcmp(argv[i], "-f") == 0)
+        {
+            buffer_size = atoi(argv[i+1]);
+        }
+        else if(strcmp(argv[i], "-n") == 0)
+        {
+            max_packets = atoi(argv[i+1]);
+        }
+        else if(strcmp(argv[i], "-l") == 0)
+        {
+            packet_len = atoi(argv[i+1]);
+        }
+        else if(strcmp(argv[i], "-r") == 0)
+        {
+            gen_rate = atoi(argv[i+1]);
+        }
+    }
 
     thread packet_gen_thread(packet_generator);
     thread GBN_connect_thread(GBN_connect);
