@@ -10,7 +10,7 @@ using namespace std;
 
 #define port_no 20020
 #define MAX_LINE 1024
-#define localhost "127.0.0.1"
+#define ip_val "192.168.1.5"
 
 // Constant parameters for the GBN protocol
 float gen_rate = 2;
@@ -219,7 +219,7 @@ void GBN_connect()
     // Filling server information
     recvGBN.sin_family = AF_INET;
     recvGBN.sin_port = htons(port_no);
-    recvGBN.sin_addr.s_addr = inet_addr(localhost);
+    recvGBN.sin_addr.s_addr = inet_addr(ip_val);
 
     char buffer[MAX_LINE] = {0};
     socklen_t len_ack;

@@ -30,7 +30,7 @@ int main()
     // Filling server information
     recvGBN.sin_family = AF_INET;
     recvGBN.sin_port = htons(port_no);
-    recvGBN.sin_addr.s_addr = inet_addr(localhost);
+    recvGBN.sin_addr.s_addr = INADDR_ANY;
 
     // Binding the socket with the server address
     int bind_status = bind(sock, (const struct sockaddr *)&recvGBN, sizeof(recvGBN));
