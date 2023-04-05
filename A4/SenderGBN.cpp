@@ -17,7 +17,7 @@ float gen_rate = 2;
 int buffer_size = 10;
 int packet_len = 10;
 int window_size = 10;
-float timeout = 4000;
+float timeout = 100000;
 bool debug = true;
 
 mutex m;
@@ -74,7 +74,7 @@ void packet_generator()
 
 void timeout_ack(int seq_no, int start_val, int win)
 {
-    usleep(timeout * 1000);
+    usleep(timeout);
     m.lock();
     if(win != window_count)
     {
@@ -86,7 +86,6 @@ void timeout_ack(int seq_no, int start_val, int win)
         m.unlock();
         return;
     }
-    cout << "Timeout for packet " << seq_no + start_val << " " << win << endl;
     window_count++;
     timeout_check = true;
     // Remove packets from 0 to LFT from packet_window
@@ -138,7 +137,6 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
             timeout_thread.detach();
             m.unlock();
             string data = packet.substr(1, packet.length() - 1);
-            cout<<"Packet sent "<< int(packet[0]) << " " << data << endl;
             win_trav++;
         }
         while(1)
@@ -153,7 +151,6 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
             if(LFT == window_size - 1)
             {
                 packet_window.clear();
-                cout<<"--------------------------" << endl;
                 window_count++;
                 m.unlock();
                 break;
@@ -189,9 +186,13 @@ void ack_receiver(int sock, struct sockaddr_in &sendGBN, socklen_t &len, long ti
         RTT_start[stoi(buffer)] -= time_micro; 
         if(debug)
         {
-            cout << "Seq #: " << buffer << " Time Generated: " << RTT_start[stoi(buffer)]/1000 << ":" << RTT_start[stoi(buffer)]%1000 << " RTT: " << RTT << " Number of Retransmissions: " << transmit_count[stoi(buffer)] << endl;
+            cout << "Seq #: " << buffer << " Time Generated: " << RTT_start[stoi(buffer)]/1000 << ":" << RTT_start[stoi(buffer)]%1000 << " RTT: " << RTT << " Number of Attempts: " << transmit_count[stoi(buffer)] << endl;
         }
         ack_count = max(ack_count, stoi(buffer) + 1);
+        if(ack_count > 10)
+        {
+            timeout = 2 * RTT_avg;
+        }
         if(stoi(buffer) > LFT)
         {
             prev_LFT = LFT;

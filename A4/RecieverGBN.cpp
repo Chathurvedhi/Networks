@@ -68,7 +68,6 @@ int main()
         // Drop the packet if it is not the next frame expected
         if(seq_num != NFE)
         {
-            cout << seq_num << " ";
             continue;
         }
         
@@ -76,13 +75,19 @@ int main()
         float temp_num = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
         if(temp_num < random_drop_prob)
         {
-            cout << "Packet drop random " << seq_num << endl;
-            cout << "NFE drops :";
+            if(debug)
+            {
+                auto end = chrono::high_resolution_clock::now();
+                auto duration = chrono::duration_cast<chrono::microseconds>(end - start);
+                int micro = duration.count();
+                int milli = micro/1000;
+                micro = micro%1000;
+                cout<<"Seq No: "<<seq_num<< "  ";
+                cout<<"Time: " << milli << ":" << micro << "  ";
+                cout<<"Packet dropped: True "<<endl;
+            }
             continue;
         }
-
-        //cout<<"Seq packet: "<<seq_num<<" "<<NFE<<" "<<packet<<endl;
-
 
         // If debug mode is on, print the received packet
         if(debug)
@@ -100,7 +105,6 @@ int main()
         // Send ACK
         string ack = to_string(seq_num);
         sendto(sock, ack.c_str(), ack.length(), MSG_CONFIRM, (const struct sockaddr *)&sendGBN, len);
-        //cout<<"ACK sent: "<<ack<<endl;
        
         // Increment NFE and packets received
         NFE = (NFE + 1);
