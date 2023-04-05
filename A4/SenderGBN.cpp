@@ -8,17 +8,17 @@
 
 using namespace std;
 
-#define port_no 20020
 #define MAX_LINE 1024
-#define ip_val "192.168.1.5"
 
 // Constant parameters for the GBN protocol
-float gen_rate = 2;
+float gen_rate = 50;
 int buffer_size = 10;
-int packet_len = 10;
-int window_size = 10;
+int packet_len = 512;
+int window_size = 3;
 float timeout = 100000;
 bool debug = true;
+int port_no = 20020;
+string ip_val =  "127.0.0.1";
 
 mutex m;
 
@@ -39,6 +39,7 @@ int window_count = 0;
 long RTT_avg = 0;
 int trans_count = 0;
 int ack_count = 0;
+bool empty_window = false;
 
 void exit_function()
 {
@@ -66,7 +67,18 @@ void packet_generator()
         m.lock();
         packet_buffer.push(packet);
         m.unlock();
-        seq_no = (seq_no + 1) % 256;
+        seq_no ++;
+        if(seq_no == 256)
+        {
+            seq_no = 0;
+            for(int i = 0; i < 256 - window_size; i++)
+            {
+                empty_window = true;
+                thread_kills[i] = false;
+                transmit_count[i] = 0;
+                RTT_start[i] = 0;
+            }
+        }
         usleep(1000000 / gen_rate);
     }
 }
@@ -81,7 +93,7 @@ void timeout_ack(int seq_no, int start_val, int win)
         m.unlock();
         return;
     }
-    if(thread_kills[seq_no + start_val])
+    if(thread_kills[(seq_no + start_val)%256])
     {
         m.unlock();
         return;
@@ -126,18 +138,18 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
             auto temp_time = chrono::high_resolution_clock::now();
             //Time in microseconds
             long time = chrono::duration_cast<chrono::microseconds>(temp_time.time_since_epoch()).count();
-            RTT_start[win_trav + start] = time;
-            transmit_count[win_trav + start]++;
-            if(transmit_count[win_trav + start] >= 5)
+            RTT_start[(win_trav + start)%256] = time;
+            transmit_count[(win_trav + start)%256]++;
+            cout<<"transmit_cout of " << (win_trav + start)%256 << " is " << transmit_count[(win_trav + start)%256] << endl;
+            if(transmit_count[(win_trav + start)%256] >= 5)
             {
                 cout << "Max Retransmit" << endl;
                 exit_function();
             }
             timeout_thread = thread(timeout_ack, win_trav, start, window_count);
             timeout_thread.detach();
-            m.unlock();
-            string data = packet.substr(1, packet.length() - 1);
             win_trav++;
+            m.unlock();
         }
         while(1)
         {
@@ -158,6 +170,16 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
             m.unlock();
         }
         m.lock();
+        if(empty_window)
+        {
+            empty_window = false;
+            for(int i = LFT + 1; i<256; i++)
+            {
+                thread_kills[i] = false;
+                transmit_count[i] = 0;
+                RTT_start[i] = 0;
+            }
+        }
         start = start + LFT + 1;
         LFT = -1;
         prev_LFT = -1;
@@ -183,7 +205,7 @@ void ack_receiver(int sock, struct sockaddr_in &sendGBN, socklen_t &len, long ti
         long RTT = time - RTT_start[stoi(buffer)];
         RTT_avg = RTT_avg * stoi(buffer) + RTT;
         RTT_avg = RTT_avg / (stoi(buffer) + 1);
-        RTT_start[stoi(buffer)] -= time_micro; 
+        RTT_start[stoi(buffer) ] -= time_micro; 
         if(debug)
         {
             cout << "Seq #: " << buffer << " Time Generated: " << RTT_start[stoi(buffer)]/1000 << ":" << RTT_start[stoi(buffer)]%1000 << " RTT: " << RTT << " Number of Attempts: " << transmit_count[stoi(buffer)] << endl;
@@ -199,7 +221,7 @@ void ack_receiver(int sock, struct sockaddr_in &sendGBN, socklen_t &len, long ti
             LFT = stoi(buffer) - start;
             for(int i = prev_LFT + 1; i <= LFT; i++)
             {
-                thread_kills[i + start] = true;
+                thread_kills[(i + start)%256] = true;
             }
         }
         m.unlock();
@@ -220,7 +242,7 @@ void GBN_connect()
     // Filling server information
     recvGBN.sin_family = AF_INET;
     recvGBN.sin_port = htons(port_no);
-    recvGBN.sin_addr.s_addr = inet_addr(ip_val);
+    recvGBN.sin_addr.s_addr = inet_addr(ip_val.c_str());
 
     char buffer[MAX_LINE] = {0};
     socklen_t len_ack;
@@ -236,9 +258,10 @@ void GBN_connect()
     ack_recv_thread.join();
 }
 
-int main()
+int main(int argc, char *argv[])
 {
     srand(time(0));
+
 
 
     thread packet_gen_thread(packet_generator);

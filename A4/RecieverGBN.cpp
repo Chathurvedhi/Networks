@@ -41,8 +41,8 @@ int main()
     }
 
     int NFE = 0;                            //Next Frame Expected
-    float random_drop_prob = 0.1;           //Probability of dropping a packet
-    int max_packets = 25;                  //Maximum number of packets to be received
+    float random_drop_prob = 0.00001;           //Probability of dropping a packet
+    int max_packets = 4000;                  //Maximum number of packets to be received
     bool debug = true;                     //Debug mode
     socklen_t len;
     len = sizeof(sendGBN);
@@ -58,7 +58,8 @@ int main()
         buffer[n] = '\0';
 
         // First byte is the sequence number rest is packet
-        int seq_num = buffer[0];
+        int seq_num = (uint8_t) buffer[0];
+        //cout<< seq_num << endl;
         string packet = "";
         for(int i = 1; i < n; i++)
         {
@@ -105,9 +106,9 @@ int main()
         // Send ACK
         string ack = to_string(seq_num);
         sendto(sock, ack.c_str(), ack.length(), MSG_CONFIRM, (const struct sockaddr *)&sendGBN, len);
-       
+        //cout << "ACK sent for packet " << seq_num << endl;
         // Increment NFE and packets received
-        NFE = (NFE + 1);
+        NFE = (NFE + 1)%256;
         max_packets--;
         if(max_packets == 0)
         {
