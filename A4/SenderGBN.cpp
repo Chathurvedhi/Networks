@@ -18,6 +18,7 @@ int window_size = 3;
 float timeout = 100000;
 bool debug = true;
 int port_no = 20020;
+int max_packets = 400;
 string ip_val =  "127.0.0.1";
 
 mutex m;
@@ -99,6 +100,7 @@ void timeout_ack(int seq_no, int start_val, int win)
         return;
     }
     window_count++;
+    //cout<<"Timeout for " << (seq_no + start_val)%256 << " " << win%256<< endl;
     timeout_check = true;
     // Remove packets from 0 to LFT from packet_window
     for(int i = 0; i <= LFT; i++)
@@ -134,18 +136,20 @@ void packet_sender(int sock, struct sockaddr_in &recvGBN, socklen_t &len)
                 packet_window.push_back(packet);
             }
             sendto(sock, (const char *)packet.c_str(), packet.length(), MSG_CONFIRM, (const struct sockaddr *)&recvGBN, len);
+            //cout<<"Sent packet " << int(packet[0]) << endl;
             trans_count++;
             auto temp_time = chrono::high_resolution_clock::now();
             //Time in microseconds
             long time = chrono::duration_cast<chrono::microseconds>(temp_time.time_since_epoch()).count();
             RTT_start[(win_trav + start)%256] = time;
             transmit_count[(win_trav + start)%256]++;
-            cout<<"transmit_cout of " << (win_trav + start)%256 << " is " << transmit_count[(win_trav + start)%256] << endl;
+            //cout<<"transmit_cout of " << (win_trav + start)%256 << " is " << transmit_count[(win_trav + start)%256] << endl;
             if(transmit_count[(win_trav + start)%256] >= 5)
             {
                 cout << "Max Retransmit" << endl;
                 exit_function();
             }
+
             timeout_thread = thread(timeout_ack, win_trav, start, window_count);
             timeout_thread.detach();
             win_trav++;
@@ -210,20 +214,31 @@ void ack_receiver(int sock, struct sockaddr_in &sendGBN, socklen_t &len, long ti
         {
             cout << "Seq #: " << buffer << " Time Generated: " << RTT_start[stoi(buffer)]/1000 << ":" << RTT_start[stoi(buffer)]%1000 << " RTT: " << RTT << " Number of Attempts: " << transmit_count[stoi(buffer)] << endl;
         }
+        //cout<<"Received ACK, LFT " << buffer << ", " << LFT << " Transmit count: " << transmit_count[stoi(buffer)] <<endl;
+        //thread_kills[stoi(buffer)] = true;
+        //cout << "Killed thread " << stoi(buffer) << endl;
         ack_count = max(ack_count, stoi(buffer) + 1);
         if(ack_count > 10)
         {
             timeout = 2 * RTT_avg;
         }
-        if(stoi(buffer) > LFT)
+        if(stoi(buffer) >= (LFT + start+1)%256)
         {
             prev_LFT = LFT;
-            LFT = stoi(buffer) - start;
+            LFT = (stoi(buffer) - start)%256;
+            if(LFT < 0) LFT += 256;
             for(int i = prev_LFT + 1; i <= LFT; i++)
             {
-                thread_kills[(i + start)%256] = true;
+                //cout<<"a";
+                if(thread_kills[(i + start)%256] == false)
+                {
+                    thread_kills[(i + start)%256] = true;
+                    //cout<<"Killed thread " << (i + start)%256 << endl;
+                }
             }
         }
+        if(LFT < 0) LFT += 256;
+        //cout << "LFT: " << LFT << "Start: " << start << endl;
         m.unlock();
     }
 }
