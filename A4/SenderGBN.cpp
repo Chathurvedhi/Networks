@@ -56,7 +56,7 @@ void exit_function()            // Called when Sender is terminated
 {
     cout << "Packet_gen_rate : " << gen_rate << endl;
     cout << "Packet_len : " << packet_len << endl;
-    cout << "Average RTT : " << RTT_avg << endl;
+    cout << "Average RTT : " << RTT_avg/1000 << ":" << RTT_avg%1000 << endl;
     cout << "Retransmission Ratio : " << float(trans_count) / ack_count << endl;
     exit(0);
 }
