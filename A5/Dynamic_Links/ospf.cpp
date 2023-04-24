@@ -40,9 +40,9 @@ class ospf
 {
 public:
     int id;
-    int hello_interval = 2;
+    int hello_interval = 1;
     int lsa_interval = 5;
-    int spf_interval = 15;
+    int spf_interval = 20;
     int sockfd;
     int lsa_seqno = 1;
     struct sockaddr_in servaddr;
