@@ -27,13 +27,20 @@ public:
     unordered_map<int, int> entries;
 };
 
+class path_info
+{
+public:
+    int cost = INT_MAX;
+    vector<int> path;
+};
+
 class ospf
 {
 public:
     int id;
     int hello_interval = 2;
     int lsa_interval = 5;
-    int spf_interval = 5;
+    int spf_interval = 15;
     int sockfd;
     int lsa_seqno = 1;
     struct sockaddr_in servaddr;
@@ -53,7 +60,59 @@ public:
     void hello_gen();
     void lsa_gen();
     void topology();
+    void dijkstra();
 };
+
+void ospf::dijkstra()
+{
+    // Implement Dijkstra's Algorithm along with Shortest Path Finding with topology table
+    int num_nodes = topology_table.size();
+    vector<path_info> dist(num_nodes);
+    vector<bool> visited(num_nodes, false);
+    dist[id].cost = 0;
+    for(int iter = 0; iter < num_nodes; iter++)
+    {
+        int min_dist = INT_MAX;
+        int min_index = -1;
+
+        for(int i=0;i<num_nodes;i++)
+        {
+            if(visited[i] == false && dist[i].cost <= min_dist)
+            {
+                min_dist = dist[i].cost;
+                min_index = i;
+            }
+        }
+
+        visited[min_index] = true;
+        
+        for(int i=0;i<num_nodes;i++)
+        {
+            if(!visited[i] && topology_table[min_index][i] && dist[min_index].cost != INT_MAX && dist[min_index].cost + topology_table[min_index][i] < dist[i].cost)
+            {
+                dist[i].cost = dist[min_index].cost + topology_table[min_index][i];
+                dist[i].path = dist[min_index].path;
+                dist[i].path.push_back(min_index);
+            }
+        }
+    }
+    
+    fstream fp;
+    fp.open("Outputs/output_" + to_string(id), ios::app);
+    fp<<"Shortest Path from "<<id<<" to all other nodes:"<<endl;
+    for(int i=0;i<num_nodes;i++)
+    {
+        if(i == id) continue;
+        fp<<"Node "<<i<<": ";
+        for(auto it = dist[i].path.begin(); it != dist[i].path.end(); it++)
+        {
+            fp<<*it<<"-";
+        }
+        fp << i << endl;
+        fp<<" Cost: "<<dist[i].cost<<endl;
+    }
+    fp.close();
+}
 
 void ospf::lsa_response(string buffer)
 {
@@ -248,6 +307,8 @@ void ospf::topology()
         {
             fp << it->first << " " << it->second << endl;
         }
+        fp.close();
+        dijkstra();
     }
 }
 
