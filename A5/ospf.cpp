@@ -13,6 +13,8 @@ using namespace std;
 #define MAX_LINE 1024
 #define localhost "127.0.0.1"
 
+mutex mtx;
+
 class file_info
 {
 public:
@@ -22,7 +24,7 @@ public:
 
 class lsa_info
 {
-public:
+public: 
     int seqno;
     unordered_map<int, int> entries;
 };
@@ -61,57 +63,25 @@ public:
     void lsa_gen();
     void topology();
     void dijkstra();
+    void compute_topology();
 };
 
-void ospf::dijkstra()
+void ospf::compute_topology()
 {
-    // Implement Dijkstra's Algorithm along with Shortest Path Finding with topology table
     int num_nodes = topology_table.size();
-    vector<path_info> dist(num_nodes);
-    vector<bool> visited(num_nodes, false);
-    dist[id].cost = 0;
-    for(int iter = 0; iter < num_nodes; iter++)
-    {
-        int min_dist = INT_MAX;
-        int min_index = -1;
-
-        for(int i=0;i<num_nodes;i++)
-        {
-            if(visited[i] == false && dist[i].cost <= min_dist)
-            {
-                min_dist = dist[i].cost;
-                min_index = i;
-            }
-        }
-
-        visited[min_index] = true;
-        
-        for(int i=0;i<num_nodes;i++)
-        {
-            if(!visited[i] && topology_table[min_index][i] && dist[min_index].cost != INT_MAX && dist[min_index].cost + topology_table[min_index][i] < dist[i].cost)
-            {
-                dist[i].cost = dist[min_index].cost + topology_table[min_index][i];
-                dist[i].path = dist[min_index].path;
-                dist[i].path.push_back(min_index);
-            }
-        }
-    }
-    
-    fstream fp;
-    fp.open("Outputs/output_" + to_string(id), ios::app);
-    fp<<"Shortest Path from "<<id<<" to all other nodes:"<<endl;
-    for(int i=0;i<num_nodes;i++)
+    mtx.lock();
+    for(int i = 0; i < num_nodes; i++)
     {
         if(i == id) continue;
-        fp<<"Node "<<i<<": ";
-        for(auto it = dist[i].path.begin(); it != dist[i].path.end(); it++)
+        unordered_map<int, int> temp_entries;
+        temp_entries = lsa_table[i].entries;
+        for(auto it = temp_entries.begin(); it != temp_entries.end(); it++)
         {
-            fp<<*it<<"-";
+            topology_table[i][it->first] = it->second;
+            topology_table[it->first][i] = it->second;
         }
-        fp << i << endl;
-        fp<<" Cost: "<<dist[i].cost<<endl;
     }
-    fp.close();
+    mtx.unlock();
 }
 
 void ospf::lsa_response(string buffer)
@@ -128,12 +98,14 @@ void ospf::lsa_response(string buffer)
     if(lsa_nodes[n_id] >= n_seqno) return;
     lsa_nodes[n_id] = n_seqno;
 
-    // Update topology table
+    // Update LSA table
+    mtx.lock();
+    lsa_info lsa_temp;
+    lsa_temp.seqno = n_seqno;
     int num_entries;
     char* num_entries_str;
     num_entries_str = strtok(NULL, "|");
     num_entries = atoi(num_entries_str);
-
     for(int i=0; i<num_entries; i++)
     {
         char* entry;
@@ -141,9 +113,10 @@ void ospf::lsa_response(string buffer)
         int entry_id = atoi(entry);
         entry = strtok(NULL, "|");
         int entry_cost = atoi(entry);
-        topology_table[n_id][entry_id] = entry_cost;
-        topology_table[entry_id][n_id] = entry_cost;
+        lsa_temp.entries[entry_id] = entry_cost;
     }
+    lsa_table[n_id] = lsa_temp;
+    mtx.unlock();
 
     // Send LSA to all neighbours
     for(auto it = neighbours_file.begin(); it != neighbours_file.end(); it++)
@@ -288,12 +261,14 @@ void ospf::topology()
     while(1)
     {
         sleep(spf_interval);
+        
+        /* Printing topology
         fstream fp;
         fp.open("Outputs/output_" + to_string(id), ios::out);
         fp << "Node " << id << " : " << endl;
         
-        // Print a Adjaency Matrix
-        fp << "Adjacency Matrix : " << endl;
+        // Compute topology and print as adjacency matrix
+        compute_topology();
         for(int i = 0; i < topology_table.size(); i++)
         {
             for(int j = 0; j < topology_table[i].size(); j++)
@@ -302,13 +277,64 @@ void ospf::topology()
             }
             fp << endl;
         }
-        fp << "Neighbours :" << endl;
-        for(auto it = neighbours_cost.begin(); it != neighbours_cost.end(); it++)
+        */
+
+        // Compute topology with lsa_table
+        compute_topology();
+        
+        // Implement Dijkstra's Algorithm along with Shortest Path Finding with topology table
+        int num_nodes = topology_table.size();
+        vector<path_info> dist(num_nodes);
+        vector<bool> visited(num_nodes, false);
+        dist[id].cost = 0;
+        for(int iter = 0; iter < num_nodes; iter++)
         {
-            fp << it->first << " " << it->second << endl;
+            int min_dist = INT_MAX;
+            int min_index = -1;
+
+            for(int i=0;i<num_nodes;i++)
+            {
+                if(visited[i] == false && dist[i].cost <= min_dist)
+                {
+                    min_dist = dist[i].cost;
+                    min_index = i;
+                }
+            }
+
+            visited[min_index] = true;
+
+            for(int i=0;i<num_nodes;i++)
+            {
+                if(!visited[i] && topology_table[min_index][i] && dist[min_index].cost != INT_MAX && dist[min_index].cost + topology_table[min_index][i] < dist[i].cost)
+                {
+                    dist[i].cost = dist[min_index].cost + topology_table[min_index][i];
+                    dist[i].path = dist[min_index].path;
+                    dist[i].path.push_back(min_index);
+                }
+            }
+        }
+
+        fstream fp;
+        fp.open("Outputs/output_" + to_string(id), ios::out);
+        fp<<"Shortest Path from "<<id<<" to all other nodes:"<<endl;
+        for(int i=0;i<num_nodes;i++)
+        {
+            if(i == id) continue;
+            fp<<"Node "<<i<<": " ;
+            if(dist[i].cost == INT_MAX)
+            {
+                fp<<"No path exists"<<endl;
+                continue;
+            }
+            fp<<"Cost: "<<dist[i].cost<<endl;
+            fp<<"Path: ";
+            for(auto it = dist[i].path.begin(); it != dist[i].path.end(); it++)
+            {
+                fp<<*it<<"-";
+            }
+            fp << i << endl;
         }
         fp.close();
-        dijkstra();
     }
 }
 

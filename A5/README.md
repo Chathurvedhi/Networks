@@ -2,11 +2,19 @@
 
 ## Instructions to run the code
 
-* Makefile is provided to compile the code. Run `make` to compile the code. If not just the following command to compile the code.
-```cpp
-g++ ospf.cpp -o ospf -g -O3
+* Makefile is provided to compile the code with given commands: 
 ```
+make ospf : compiles the code and makes directory Outputs
+make clean : removes the executable ospf and gives new empty Outputs directory
+```
+
+* If you want to compile the code manually, use the following command:
+```
+g++ ospf.cpp -o ospf -g -O3
+mkdir Outputs
+```
+
 * Run the code as follows:
-```cpp
+```
 ./ospf -i <node_id> -f <input_filename> -h <hello_interval> -a <lsa_interval> -s <spf_interval>
 ```
