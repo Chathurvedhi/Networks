@@ -14,6 +14,8 @@ g++ ospf.cpp -o ospf -g -O3
 mkdir Outputs
 ```
 
+* Please make sure to __create the Outputs directory__ before running the code.
+
 * Run the code as follows:
 ```
 ./ospf -i <node_id> -f <input_filename> -o <outputfilename> -h <hello_interval> -a <lsa_interval> -s <spf_interval>
