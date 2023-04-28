@@ -13,30 +13,30 @@ using namespace std;
 #define MAX_LINE 1024
 #define localhost "127.0.0.1"
 
-mutex mtx;
+mutex mtx;  // Mutex for locking
 
-class file_info
+class file_info     // Storing min and max cost for each neighbour
 {
 public:
     int min_cost;
     int max_cost;
 };
 
-class lsa_info
+class lsa_info      // Storing LSA information for each node
 {
 public: 
     int seqno;
     unordered_map<int, int> entries;
 };
-
-class path_info
+ 
+class path_info     // Storing path information for each node
 {
 public:
     int cost = INT_MAX;
     vector<int> path;
 };
 
-class ospf
+class ospf          // Main class for OSPF
 {
 public:
     int id;
@@ -49,12 +49,14 @@ public:
     struct sockaddr_in cliaddr;
     struct sockaddr_in neighbour_addr;
     int len;
-    unordered_map<int, file_info> neighbours_file;
-    unordered_map<int, int> neighbours_cost;
-    unordered_map<int, int> lsa_nodes;
-    vector<vector<int>> topology_table;
-    unordered_map<int, lsa_info> lsa_table;
-    void ospf_init(string filename);
+    long long start_time_ms;                                // Start time in milliseconds
+    unordered_map<int, file_info> neighbours_file;          // File information for each neighbour
+    unordered_map<int, int> neighbours_cost;                // Cost for each neighbour after helloreply
+    unordered_map<int, int> lsa_nodes;                      // Sequence number for each node
+    vector<vector<int>> topology_table;                     // Adjacency matrix for topology
+    unordered_map<int, lsa_info> lsa_table;                 // LSA info for each node
+    string filename_out;                                    // Output file name
+    void ospf_init(string filename, string outfile);
     void reciever();
     void hello_response();
     void helloreply_response();
@@ -62,11 +64,10 @@ public:
     void hello_gen();
     void lsa_gen();
     void topology();
-    void dijkstra();
     void compute_topology();
 };
 
-void ospf::compute_topology()
+void ospf::compute_topology()   // Computes adjacency matrix with LSA information
 {
     int num_nodes = topology_table.size();
     mtx.lock();
@@ -84,7 +85,7 @@ void ospf::compute_topology()
     mtx.unlock();
 }
 
-void ospf::lsa_response(string buffer)
+void ospf::lsa_response(string buffer)    // LSA response
 {
     // Sender details
     char* sender_id;
@@ -137,15 +138,12 @@ void ospf::hello_response()
     sender_id = strtok(NULL, "|");
     int n_id = atoi(sender_id);
         
-    // Debug
-    //cout<<"Received HELLO from "<<n_id<<endl;
-
     // Random cost between min and max
     int cost;
     cost = rand() % (neighbours_file[n_id].max_cost - neighbours_file[n_id].min_cost + 1) + neighbours_file[n_id].min_cost;
     neighbours_cost[n_id] = cost;
     
-    // Send Hello Reply
+    // Send Hello Reply with cost
     char hello_reply[MAX_LINE];
     strcpy(hello_reply, "HELLOREPLY|");
     strcat(hello_reply, to_string(id).c_str());
@@ -163,16 +161,12 @@ void ospf::helloreply_response()
     sender_id = strtok(NULL, "|");
     int n_id = atoi(sender_id);
     
-    // Debug
-    //cout<<"Received HELLOREPLY from "<<n_id<<endl;
-
     // Check if our id is correct
     char* receiver_id;
     receiver_id = strtok(NULL, "|");
     int our_id = atoi(receiver_id);
     if(our_id != id)
     {
-        cout << "Error : Wrong Reciever ID" << endl;
         return;
     }
 
@@ -187,12 +181,17 @@ void ospf::reciever()
 {
     while(1)
     {
+        // Recieve packet
         char buffer[MAX_LINE];
         int n = recvfrom(sockfd, (char *)buffer, MAX_LINE, MSG_WAITALL, (struct sockaddr *)&cliaddr, (socklen_t *)&len);
         buffer[n] = '\0';
         string packet = buffer;
+
+        // Check packet type
         char* pack_type;
         pack_type = strtok(buffer, "|");
+
+        // Call appropriate function
         if(strcmp(pack_type, "HELLO")==0) hello_response();
         else if(strcmp(pack_type, "HELLOREPLY")==0) helloreply_response();
         else if(strcmp(pack_type, "LSA")==0) lsa_response(packet);
@@ -203,7 +202,10 @@ void ospf::hello_gen()
 {
     while(1)
     {
+        // Sleep for hello interval
         sleep(hello_interval);
+
+        // Packet to send
         char hello[MAX_LINE];
         strcpy(hello, "HELLO|");
         strcat(hello, to_string(id).c_str());
@@ -314,33 +316,40 @@ void ospf::topology()
             }
         }
 
+        // Calculate time now
+        auto now = chrono::high_resolution_clock::now();
+        long long int time_now = chrono::duration_cast<chrono::milliseconds>(now.time_since_epoch()).count();
+        time_now = time_now - start_time_ms;
+        time_now = time_now / 1000; 
+
+        // Print to file
         fstream fp;
-        fp.open("Outputs/output_" + to_string(id), ios::out);
-        fp<<"Shortest Path from "<<id<<" to all other nodes:"<<endl;
+        fp.open("Outputs/" + filename_out, ios::out);
+        fp<<"Shortest Path from "<<id<<" to all other nodes at time : " << time_now << endl;
+        fp<<"Node | Cost | Path"<<endl;
         for(int i=0;i<num_nodes;i++)
         {
             if(i == id) continue;
-            fp<<"Node "<<i<<": " ;
+            fp<< i << " | ";
             if(dist[i].cost == INT_MAX)
             {
                 fp<<"No path exists"<<endl;
                 continue;
             }
-            fp<<"Cost: "<<dist[i].cost<<endl;
-            fp<<"Path: ";
+            fp<< dist[i].cost << " | ";
             for(auto it = dist[i].path.begin(); it != dist[i].path.end(); it++)
             {
                 fp<<*it<<"-";
             }
-            fp << i << endl;
+            fp << i << " |" << endl;
         }
         fp.close();
     }
 }
 
-
-void ospf::ospf_init(string filename)
+void ospf::ospf_init(string filename, string outfile)
 {
+    // Basic data
     fstream fp;
     fp.open(filename, ios::in);
     int num_nodes;
@@ -358,6 +367,13 @@ void ospf::ospf_init(string filename)
         }
         topology_table.push_back(temp);
     }
+
+    // Default filename or given filename
+    if(outfile == "")
+    {
+        outfile = "output_" + to_string(id);
+    }
+    filename_out = outfile;
 
     // Read lines to get all neighbours for id
     for(int i = 0; i < num_edges; i++)
@@ -383,6 +399,10 @@ void ospf::ospf_init(string filename)
 
     cout << "Initialised OSPF for node " << id << endl;
 
+    // store time of initialisation
+    auto start_time = chrono::high_resolution_clock::now();
+    start_time_ms = chrono::duration_cast<chrono::milliseconds>(start_time.time_since_epoch()).count();
+
     // UDP socket with port number 10000 + id
     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if(sockfd < 0)
@@ -402,7 +422,7 @@ void ospf::ospf_init(string filename)
     }
     len = sizeof(cliaddr);
 
-    // Threads
+    // Threads for all processes
     thread ospf_reciever(&ospf::reciever, this);
     thread ospf_hello_gen(&ospf::hello_gen, this);
     thread ospf_topology(&ospf::topology, this);
@@ -417,6 +437,7 @@ void ospf::ospf_init(string filename)
 int main(int argc, char *argv[])
 {
     string filename;
+    string outfile = "";
     ospf op;
     // Arguments for running the program
     for(int i = 1; i < argc; i++)
@@ -430,6 +451,11 @@ int main(int argc, char *argv[])
         {
             // Router ID
             op.id = atoi(argv[i+1]);
+        }
+        else if(strcmp(argv[i], "-o") == 0)
+        {
+            //Output file name change
+            outfile = argv[i+1];
         }
         else if(strcmp(argv[i], "-h") == 0)
         {
@@ -447,5 +473,5 @@ int main(int argc, char *argv[])
             op.spf_interval = atoi(argv[i+1]);
         }
     }
-    op.ospf_init(filename);
+    op.ospf_init(filename, outfile);
 }

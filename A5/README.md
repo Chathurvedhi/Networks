@@ -16,5 +16,5 @@ mkdir Outputs
 
 * Run the code as follows:
 ```
-./ospf -i <node_id> -f <input_filename> -h <hello_interval> -a <lsa_interval> -s <spf_interval>
+./ospf -i <node_id> -f <input_filename> -o <outputfilename> -h <hello_interval> -a <lsa_interval> -s <spf_interval>
 ```
