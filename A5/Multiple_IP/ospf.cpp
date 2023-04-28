@@ -55,14 +55,14 @@ public:
     unordered_map<int, int> lsa_nodes;                      // Sequence number for each node
     vector<vector<int>> topology_table;                     // Adjacency matrix for topology
     unordered_map<int, lsa_info> lsa_table;                 // LSA info for each node
+    unordered_map<int,string> ip_table;                     // IP address for each node
     string filename_out;                                    // Output file name
+    string ip_val;                                          // IP address of this node
     void ospf_init(string filename, string outfile);
     void reciever();
     void hello_response();
     void helloreply_response();
     void lsa_response(string buffer);
-    void remove_response();
-    void add_response();
     void hello_gen();
     void lsa_gen();
     void topology();
@@ -71,16 +71,6 @@ public:
 
 void ospf::compute_topology()   // Computes adjacency matrix with LSA information
 {
-    // Clear topology table
-    for(int i = 0; i < topology_table.size(); i++)
-    {
-        for(int j = 0; j < topology_table.size(); j++)
-        {
-            topology_table[i][j] = 0;
-        }
-    }
-
-
     int num_nodes = topology_table.size();
     mtx.lock();
     for(int i = 0; i < num_nodes; i++)
@@ -138,7 +128,7 @@ void ospf::lsa_response(string buffer)    // LSA response
         // Send to port 10000 + it->first
         neighbour_addr.sin_family = AF_INET;
         neighbour_addr.sin_port = htons(10000 + it->first);
-        neighbour_addr.sin_addr.s_addr = inet_addr(localhost);
+        neighbour_addr.sin_addr.s_addr = inet_addr(ip_table[it->first].c_str());
         sendto(sockfd, (const char *)buffer.c_str(), strlen(buffer.c_str()), MSG_CONFIRM, (const struct sockaddr *)&neighbour_addr, len);
     }
 }
@@ -189,42 +179,6 @@ void ospf::helloreply_response()
     neighbours_cost[n_id] = n_cost;
 }
 
-void ospf::remove_response()    // Remove neighbour
-{
-    // Decide neighbour to remove
-    char* nodes = strtok(NULL, "|");
-    int node1 = atoi(nodes);
-    nodes = strtok(NULL, "|");
-    int node2 = atoi(nodes);
-    int n_id;
-    if(node1 == id) n_id = node2;
-    else n_id = node1;
-
-    // Remove from neighbours info
-    neighbours_file.erase(n_id);
-    neighbours_cost.erase(n_id);
-}
-
-void ospf::add_response()       // Add neighbour
-{
-    // Obtain new link with weights
-    char* nodes = strtok(NULL, "|");
-    int node1 = atoi(nodes);
-    nodes = strtok(NULL, "|");
-    int node2 = atoi(nodes);
-    int n_id;
-    if(node1 == id) n_id = node2;
-    else n_id = node1;
-    nodes = strtok(NULL, "|");
-    int min_cost = atoi(nodes);
-    nodes = strtok(NULL, "|");
-    int max_cost = atoi(nodes);
-
-    // Update in neighbours info
-    neighbours_file[n_id].min_cost = min_cost;
-    neighbours_file[n_id].max_cost = max_cost;
-}
-
 void ospf::reciever()
 {
     while(1)
@@ -243,9 +197,6 @@ void ospf::reciever()
         if(strcmp(pack_type, "HELLO")==0) hello_response();
         else if(strcmp(pack_type, "HELLOREPLY")==0) helloreply_response();
         else if(strcmp(pack_type, "LSA")==0) lsa_response(packet);
-        else if(strcmp(pack_type,"r") == 0) remove_response();
-        else if(strcmp(pack_type,"a") == 0) add_response();
-        else if(strcmp(pack_type,"q") == 0) exit(0);
     }
 }
 
@@ -267,7 +218,7 @@ void ospf::hello_gen()
             // Send to port 10000 + it->first
             neighbour_addr.sin_family = AF_INET;
             neighbour_addr.sin_port = htons(10000 + it->first);
-            neighbour_addr.sin_addr.s_addr = inet_addr(localhost);
+            neighbour_addr.sin_addr.s_addr = inet_addr(ip_table[it->first].c_str());
             sendto(sockfd, (const char *)hello, strlen(hello), MSG_CONFIRM, (const struct sockaddr *)&neighbour_addr, len);
         }
     }
@@ -302,7 +253,7 @@ void ospf::lsa_gen()
             // Send to port 10000 + it->first
             neighbour_addr.sin_family = AF_INET;
             neighbour_addr.sin_port = htons(10000 + it->first);
-            neighbour_addr.sin_addr.s_addr = inet_addr(localhost);
+            neighbour_addr.sin_addr.s_addr = inet_addr(ip_table[it->first].c_str());
             sendto(sockfd, (const char *)lsa.c_str(), strlen(lsa.c_str()), MSG_CONFIRM, (const struct sockaddr *)&neighbour_addr, len);
         }
         lsa_seqno++;
@@ -426,6 +377,16 @@ void ospf::ospf_init(string filename, string outfile)
     }
     filename_out = outfile;
 
+    // Read lines to get all ips
+    for(int i = 0; i < num_nodes; i++)
+    {
+        int n_id;
+        string ip;
+        fp >> n_id >> ip;
+        ip_table[n_id] = ip;
+        if(n_id == id) ip_val = ip;
+    }
+
     // Read lines to get all neighbours for id
     for(int i = 0; i < num_edges; i++)
     {
@@ -485,95 +446,44 @@ void ospf::ospf_init(string filename, string outfile)
     ospf_lsa_gen.join();
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
-    string filename = argv[1];
-    fstream fp;
-    fp.open(filename, ios::in);
-    int num_nodes;
-    fp >> num_nodes;
-    cout << "Number of nodes : " << num_nodes << endl;
-    fp.close();
-    
-    // Fork num_nodes processes for each router.
-    for(int i = 0; i < num_nodes ; i++)
+    string filename;
+    string outfile = "";
+    ospf op;
+    // Arguments for running the program
+    for(int i = 1; i < argc; i++)
     {
-        pid_t pid = fork();
-        if(pid == 0)
+        if(strcmp(argv[i], "-f") == 0)
         {
-            // Child process
-            ospf node;
-            node.id = i;
-            node.ospf_init(filename, "");
+            // File name
+            filename = argv[i+1];
+        }
+        else if(strcmp(argv[i], "-i") == 0)
+        {
+            // Router ID
+            op.id = atoi(argv[i+1]);
+        }
+        else if(strcmp(argv[i], "-o") == 0)
+        {
+            //Output file name change
+            outfile = argv[i+1];
+        }
+        else if(strcmp(argv[i], "-h") == 0)
+        {
+            // Hello interval
+            op.hello_interval = atoi(argv[i+1]);
+        }
+        else if(strcmp(argv[i], "-a") == 0)
+        {
+            // LSA interval
+            op.lsa_interval = atoi(argv[i+1]);
+        }
+        else if(strcmp(argv[i], "-s") == 0)
+        {
+            // SPF interval
+            op.spf_interval = atoi(argv[i+1]);
         }
     }
-
-    // Create client socket
-    int sock = socket(AF_INET, SOCK_DGRAM, 0);    
-    if(sock < 0)
-    {
-        cout<<"Socket creation failed"<<endl;
-        exit(0);
-    }
-    struct sockaddr_in servaddr, cliaddr;
-    memset(&servaddr, 0, sizeof(servaddr));
-
-    // Filling Server information
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = INADDR_ANY;
-
-    char buffer[MAX_LINE] = {0};
-    socklen_t len = sizeof(servaddr);
-
-    sleep(3);   // Wait for all nodes to initialise
-
-    // Command interface
-    while(1)
-    {
-        cout << "Enter a command : " << endl;
-        char c;
-        cin >> c;
-        if(c == 'q')
-        {
-            cout << "Exiting and shutting down all the servers" << endl;
-            
-            // Send all routers the exit message
-            for(int i = 0; i < num_nodes; i++)
-            {
-                string msg = "q";
-                servaddr.sin_port = htons(10000 + i);
-                sendto(sock, (const char *)msg.c_str(), msg.length(), MSG_CONFIRM, (const struct sockaddr *) &servaddr, len);
-            }
-            exit(0);
-        }
-        else if(c == 'r')
-        {
-            int u, v;
-            cin >> u >> v;
-            string msg = "r|" + to_string(u) + "|" + to_string(v);
-
-            // Send to u and v to remove link by deleting neighbour
-            servaddr.sin_port = htons(10000 + u);
-            sendto(sock, (const char *)msg.c_str(), msg.length(), MSG_CONFIRM, (const struct sockaddr *) &servaddr, len);
-            servaddr.sin_port = htons(10000 + v);
-            sendto(sock, (const char *)msg.c_str(), msg.length(), MSG_CONFIRM, (const struct sockaddr *) &servaddr, len);
-        }
-        else if(c == 'a')
-        {
-            int u, v, w_1, w_2;
-            cin >> u >> v >> w_1 >> w_2;
-            string msg = "a|" + to_string(u) + "|" + to_string(v) + "|" + to_string(w_1) + "|" + to_string(w_2);
-
-            // Send to u and v to add new neighbour
-            servaddr.sin_port = htons(10000 + u);
-            sendto(sock, (const char *)msg.c_str(), msg.length(), MSG_CONFIRM, (const struct sockaddr *) &servaddr, len);
-            servaddr.sin_port = htons(10000 + v);
-            sendto(sock, (const char *)msg.c_str(), msg.length(), MSG_CONFIRM, (const struct sockaddr *) &servaddr, len);
-        }
-        else
-        {
-            cout << "Wrong Command" << endl;
-        }
-    }
-    
+    op.ospf_init(filename, outfile);
 }
